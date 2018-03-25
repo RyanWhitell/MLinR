@@ -1,0 +1,432 @@
+---
+title: "K-Means and Hierarchical Cluster Analysis"
+author: "Ryan Whitell"
+output:
+  html_document: default
+csl: apa.csl
+subtitle: Exploring Wholesale Data
+bibliography: bibliography.bibtex
+---
+```{r message=FALSE}
+# Packages Required
+library(stats)       # K-means
+library(ggplot2)     # Plots
+library(data.table)  # Data Tables
+library(NbClust)     # Determine the Best K
+```
+
+\  
+\  
+
+# Introduction
+K-means and hierarchical cluster analysis (HCA) are both unsupervised learning techniques that describe data with clusters.
+
+\  
+
+### K-Means
+After the initial step of placing K points into a data space, K-means works by iterating between two steps until a local minimum is found:
+
+  * Assigning each element to one of the K centroids by closest distance
+  * Re-calculating the location of the centroids so that the distance between each element and the centroid is optimized (the mean)
+
+The K-means algorithm iterates this pattern until a local minimum is achieved (hill climbing). Because this algorithm does not always find the global minimum, ensembling random restarts is usually employed. The important parameter in K-means is K, or number of clusters to find. Choosing the right K can require domain knowledge. 
+
+\  
+
+### Hierarchical Cluster Analysis
+A data set with N examples can have anywhere between 1-N clusters. Hierarchical clustering starts with either 1 or N clusters, then uses a divisive (starting with 1) or agglomerative (starting with N) approach to produce N-K clusters. For an agglomerative example:
+
+  * The data starts with N clusters
+  * The two closest clusters combine
+  * This is repeated until there are K clusters (K <= N)
+
+There are different methods to determine the distances between each cluster, these will affect the clusters produced by the algorithm:
+
+  * Single Linkage: The smallest distance between any two points between clusters
+  * Complete link: The largest distance between any two points between clusters
+  * Average linkage: The distance between the average points of all elements between clusters
+  * Centroid linkage: The distance between the mean point (centroid) between clusters
+
+This approach will produce a tree type structure called a dendrogram. Each layer represents K clusters and the distance between the parents and the children give a visual representation of similarity.
+
+\  
+\  
+
+# The Wholesale Customers Data Set
+The data set by @Nuno:2011, retrieved from the UCI machine learning repository [@Lichman:2013], contains 440 examples with 8 features representing the amount spent (monetary units) on different product categories from 3 different regions (Lisbon, Oporto, Other) and 2 channels (retail or horeca).
+
+\  
+\  
+
+# Exploratory Data Analysis
+The purpose of exploring the data first is to get familiar with it and to see if anything is of interest. One could argue that cluster analysis is an advanced form of EDA. 
+```{r}
+customer <- read.csv("wholesale-customer-data.csv") # Read in the data
+```
+
+```{r}
+str(customer)
+```
+
+```{r}
+lapply(customer, summary)
+```
+
+\  
+
+The data in this example contains only 3 different units. The categorical representations of 'Channel' and 'Region,' and the monetary units (m.u.) of the rest. Exploring the Fresh category.
+```{r fig.cap="Figure 1: Histogram of Spending on Fresh Products", fig.align='center'}
+ggplot(aes(x = Fresh), data = customer) +
+  geom_histogram(binwidth = 1000) +
+  xlab('Annual Spending (m.u.)') +
+  ylab('Count')
+```
+
+\  
+
+It looks like the data are following a long tail distribution with some major outliers. Comparing this distributions with region.
+```{r fig.cap="Figure 2: Comparison of Spending on Fresh Products for each Region", fig.align='center'}
+ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) + 
+  geom_freqpoly(data = customer[customer$Region == 1, ], aes(color = "1"), binwidth = 1000) +
+  geom_freqpoly(data = customer[customer$Region == 2, ], aes(color = "2"), binwidth = 1000) +
+  geom_freqpoly(data = customer[customer$Region == 3, ], aes(color = "3"), binwidth = 1000) +
+  scale_color_discrete(name = "Region") +
+  xlab('Annual Spending (m.u.)') +
+  ylab('Proportion')
+```
+
+\  
+
+And Channel.
+```{r fig.cap="Figure 3: Comparison of Spending on Fresh Products for each Channel", fig.align='center'}
+ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) + 
+  geom_freqpoly(data = customer[customer$Channel == 1, ], aes(color = "1"), binwidth = 1000) +
+  geom_freqpoly(data = customer[customer$Channel == 2, ], aes(color = "2"), binwidth = 1000) +
+  scale_color_discrete(name = "Channel") +
+  xlab('Annual Spending (m.u.)') +
+  ylab('Proportion')
+```
+
+\  
+
+Perhaps some insight might be gained from comparing the total spending between regions and channels.
+```{r}
+# Convert the frame to a table
+customer <- data.table(customer)
+
+# Construct a data frame of totals using the data table
+fresh_prop <- customer[, sum(Fresh), by=.(Channel, Region)]
+fresh_prop$Category <- "Fresh"
+
+milk_prop <- customer[, sum(Milk), by=.(Channel, Region)]
+milk_prop$Category <- "Milk"
+
+grocery_prop <- customer[, sum(Grocery), by=.(Channel, Region)]
+grocery_prop$Category <- "Grocery"
+
+frozen_prop <- customer[, sum(Frozen), by=.(Channel, Region)]
+frozen_prop$Category <- "Frozen"
+
+detergents_paper_prop <- customer[, sum(Detergents_Paper), by=.(Channel, Region)]
+detergents_paper_prop$Category <- "Detergents_Paper"
+
+delicassen_prop <- customer[, sum(Delicassen), by=.(Channel, Region)]
+delicassen_prop$Category <- "Delicassen"
+
+# Combine the data tables
+customer_prop <- rbind(fresh_prop, milk_prop, grocery_prop, frozen_prop, detergents_paper_prop,  delicassen_prop)
+
+# Change 'Channel' and 'Region' to factors
+customer_prop$Channel <- as.factor(customer_prop$Channel)
+customer_prop$Region <- as.factor(customer_prop$Region)
+
+# Split the data table
+customer_prop_region <- subset(customer_prop, select = -Channel)
+customer_prop_channel <- subset(customer_prop, select = -Region)
+
+# Get the Channel and Region totals 
+channel_totals <- customer[, sum(Fresh + Milk + Grocery + Frozen + Detergents_Paper + Delicassen), by=.(Channel)]
+region_totals <- customer[, sum(Fresh + Milk + Grocery + Frozen + Detergents_Paper + Delicassen), by=.(Region)]
+
+# Calculate the amount spent per Channel/Region relative to the total
+customer_prop_channel$Prop <- 0
+customer_prop_channel[Channel == 1]$Prop <- customer_prop_channel[Channel == 1]$V1 / channel_totals[Channel == 1]$V1
+customer_prop_channel[Channel == 2]$Prop <- customer_prop_channel[Channel == 2]$V1 / channel_totals[Channel == 2]$V1
+
+customer_prop_region$Prop <- 0
+customer_prop_region[Region == 1]$Prop <- customer_prop_region[Region == 1]$V1 / region_totals[Region == 1]$V1
+customer_prop_region[Region == 2]$Prop <- customer_prop_region[Region == 2]$V1 / region_totals[Region == 2]$V1
+customer_prop_region[Region == 3]$Prop <- customer_prop_region[Region == 3]$V1 / region_totals[Region == 3]$V1
+```
+
+\  
+
+```{r fig.cap="Figure 4: Proportion of Spending per Channel", fig.align='center'}
+ggplot(data = customer_prop_channel, aes(x = Category, y = Prop, fill = Channel)) + 
+  geom_bar(stat = "identity")
+```
+
+\  
+
+```{r fig.cap="Figure 5: Proportion of Spending per Region", fig.align='center'}
+ggplot(data = customer_prop_region, aes(x = Category, y = Prop, fill = Region)) + 
+  geom_bar(stat = "identity")
+```
+
+\  
+
+From exploring the data, it seems more spending in channel 1 (horeca) goes to fresh and frozen products and more spending in channel 2 (retail) goes to grocery and detergents/paper. Also, The proportions of spending by region match those of by channel, indicating that there is likely not as much variation by region than there is by channel. 
+
+\  
+\  
+
+# Data Preprocessing
+### Normalization
+Because K-means and HCA both use measures of distance, the data need to be normalized so one feature does not dominate. However, the 'Channel' and 'Region' features should be handled separately from the others for two reasons:
+
+  * These features are categorical and the most dissimilar to the rest
+  * The other features all share the same unit of measurement, in this case, monetary units (m.u.)
+
+Therefore, 'Channel' and 'Region' should either be normalized separately or turned into dummy variables. All of the other features will be normalized relative to each other.
+```{r}
+# Returns a normalized vector between max / min
+normalize <- function(x, max, min) {
+  return ((x - min) / (max - min))
+}
+```
+
+```{r}
+# Normalize Channel and Region
+customer_norm <- customer
+customer_norm$Channel <- normalize(customer$Channel, max(customer$Channel), min(customer$Channel))
+customer_norm$Region <- normalize(customer$Region, max(customer$Region), min(customer$Region))
+```
+
+```{r}
+# Get a subset of the data without 'Channel' and 'Region'
+customer_products <- subset(customer_norm, select = c(-Channel, -Region))
+str(customer_products)
+
+# Get the maximum and minimum of all features except 'Channel' and 'Region'
+max_mu <- max(customer_products)
+min_mu <- min(customer_products)
+
+# Normalize the other features
+customer_norm$Fresh <- normalize(customer$Fresh, max_mu, min_mu)
+customer_norm$Milk <- normalize(customer$Milk, max_mu, min_mu)
+customer_norm$Grocery <- normalize(customer$Grocery, max_mu, min_mu)
+customer_norm$Frozen <- normalize(customer$Frozen, max_mu, min_mu)
+customer_norm$Detergents_Paper <- normalize(customer$Detergents_Paper, max_mu, min_mu)
+customer_norm$Delicassen <- normalize(customer$Delicassen, max_mu, min_mu)
+```
+
+```{r}
+# Check the data 
+lapply(customer_norm, summary)
+```
+
+\  
+\  
+
+# K-Means
+
+### Ensure the Results are Reproducible
+```{r}
+set.seed(77)
+```
+
+\  
+
+### Find the Optimal Number of Clusters
+K-means requires the number of clusters be specified. However, there is not enough domain logic or a business driven goal to help decide the number of clusters to try. Many different values for K can be tried and tested against each other using a measure of error. In this case, the 'within cluster sum of squares.'
+```{r}
+# Returns the tot.withinss of clusters with different k
+get.k <- function(data, max_k) {
+  # Aggregate results
+  k <- c()
+  e <- c()
+  
+  for (i in 1:max_k){
+    # Run K-means
+    cluster <- kmeans(data, iter.max = 1000, centers =  i)
+    
+    # Get tot.withinss
+    error <- cluster$tot.withinss
+    
+    # Aggregate results
+    k <- c(k, i)
+    e <- c(e, error)
+  }
+
+  return (as.data.frame(list("K" = k, "Error" = e)))
+}
+```
+
+\  
+
+The best K is one that generalizes well. The position of this is at the 'elbow' of where the error improvements trail off, suggesting diminishing returns. 
+```{r}
+# Get the K and error values
+k_values <- get.k(customer_norm, 20)
+```
+
+\  
+
+```{r fig.cap="Figure 6: K Value Error for All Data", fig.align='center'}
+# Plot
+ggplot(aes(x = K, y = Error), data = k_values) +
+  geom_line() +
+  scale_x_continuous(limits = c(0, 20), breaks = seq(0, 20, 1))
+```
+
+\  
+
+The best K is either 3, 4, or 5. Leaving out the categorical features might give us different results.
+```{r fig.cap="Figure 7: K Value Error for Products Only", fig.align='center'}
+# Get the K and error values
+k_values <- get.k(subset(customer_norm, select = c(-Channel, -Region)), 20)
+
+# Plot
+ggplot(aes(x = K, y = Error), data = k_values) +
+  geom_line() +
+  scale_x_continuous(limits = c(0, 20), breaks = seq(0, 20, 1))
+```
+
+\  
+
+These results look much better, the error is lower. However, you could now argue that a K of 6 is now in the mix. Different values for K can be explored and conclusions can be drawn from the exploration
+
+\  
+
+### Exploring The Clusters
+Using a K of 3 and leaving out the categorical variables.
+```{r}
+customer_cluster <- kmeans(subset(customer_norm, select = c(-Channel, -Region)), iter.max = 1000, center = 3)
+```
+
+\  
+
+##### Sizes
+The size of each cluster can give an indication of how well K-means performed. However, even if sizes vary greatly, the data need to be explored further to determine if this is expected or useful. In this case, the smaller clusters probably relate to the outliers that were observed during the initial EDA step.
+```{r}
+# Cluster sizes
+customer_cluster$size
+```
+
+\  
+
+##### Centers
+The clusters centers can be analyzed as well. For each cluster, the average value of each product is calculated. In this case, large numbers indicate stronger relationships. For example, one could argue that cluster 1 represents Horeca more than it represents retail because it relates closer to the Fresh category and much less to the Detergents_Paper category. In retail, there is more emphasis on selling Grocery and Detergents_Paper, but perhaps less on Fresh and Frozen products. The third cluster is large, and seems to be less variant. This might be an indication that more clusters should be explored or that the outliers should be removed. 
+```{r}
+# Cluster sizes
+customer_cluster$centers
+```
+
+\  
+
+##### Clusters
+By appending the cluster category to the original data frame some observations can be made more easily.
+```{r}
+customer$cluster <- as.factor(customer_cluster$cluster)
+
+# Fresh
+aggregate(data = customer, Fresh ~ cluster, mean)
+
+# Grocery
+aggregate(data = customer, Grocery ~ cluster, mean)
+```
+
+\  
+
+##### Plotting
+Getting a visualization of each cluster can provide some insight as well.
+```{r fig.cap="Figure 8: Visualizing Clusters", fig.align='center'}
+ggplot(customer, aes(Grocery, Fresh, color = cluster)) + geom_point()
+```
+
+\  
+\  
+
+# Hierarchical Cluster Analysis
+### Find the Optimal Number of Clusters, Linkage, Distance Measurement
+Determining the optimal number of clusters, linkage method, and distance measurement to use is tricky and requires domain knowledge. Visualizing different dendrograms could provide some insight, as can the `NbClust` package.
+```{r warnings = FALSE, results = FALSE, message = FALSE}
+# Return the best K from a variety of methods
+get.method <- function(data, methods) {
+  # Aggregate results
+  k <- c()
+  m <- c()
+  
+  for (method in methods) {
+    # Run NbClust to find the best K
+    result <- NbClust(data = data, method = method)
+    best_k <- max(result$Best.partition)
+    
+    # Aggregate results
+    k <- c(k, best_k)
+    m <- c(m, method)
+  }
+
+  return (as.data.frame(list("K" = k, "Method" = m)))
+}
+```
+
+```{r}
+# Running the following line produces messy output so it is commented out:
+# results <- get.method(customer_norm, c("ward.D", "ward.D2", "single", "complete", "average", "mcquitty", "median", "centroid"))
+# results
+#    K   Method
+# 1  7   ward.D
+# 2  4  ward.D2
+# 3  2   single
+# 4  4 complete
+# 5  2  average
+# 6  4 mcquitty
+# 7  2   median
+# 8 11 centroid
+```
+
+\  
+
+### Visualizing ward.D2
+```{r fig.cap="Figure 9: ward.D2 Dendrogram", fig.align='center'}
+customer_cluster <- hclust(dist(customer_norm), method="ward.D2")
+plot(customer_cluster, hang = -0.001, cex = 0.001)
+```
+
+\  
+
+### Visualizing single
+```{r fig.cap="Figure 10: single Dendrogram", fig.align='center'}
+customer_cluster <- hclust(dist(customer_norm), method="single")
+plot(customer_cluster, hang = -0.001, cex = 0.001)
+```
+
+\  
+
+### Visualizing complete
+```{r fig.cap="Figure 11: complete Dendrogram", fig.align='center'}
+customer_cluster <- hclust(dist(customer_norm), method="complete")
+plot(customer_cluster, hang = -0.001, cex = 0.001)
+```
+
+\  
+
+### Visualizing average
+```{r fig.cap="Figure 12: average Dendrogram", fig.align='center'}
+customer_cluster <- hclust(dist(customer_norm), method="average")
+plot(customer_cluster, hang = -0.001, cex = 0.001)
+```
+
+\  
+
+The dendrogram can provide some clues about how the data should be clustered, but it is not easy to analyze.
+
+# Conclusion
+The data itself gave a clue as to what clusters to look for. Spending differed between the two different channels, retail and horeca. Retail favored grocery, milk, and detergents/paper, horeca favored fresh and frozen. This makes 2 obvious clusters. Taking into account the outliers in each feature, the two obvious clusters become 4- the extreme and the moderate spenders of each channel.  
+Unsupervised learning can be difficult. In this example, the analysis did not provide much insight besides the obvious. It would help if there was a business goal to achieve, this would drive analysis into more useful directions, rather than building nothing out of something.
+
+\  
+\  
+
+# References

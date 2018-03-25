@@ -1,0 +1,345 @@
+---
+title: "Artificial Neural Networks"
+author: "Ryan Whitell"
+output:
+  html_document: default
+csl: apa.csl
+subtitle: Predicting the Edibility of Mushrooms
+bibliography: bibliography.bibtex
+---
+```{r message=FALSE}
+# Packages Required
+library(neuralnet)  # ANN
+library(onehot)     # One-hot encoding
+```
+
+\  
+\  
+
+# Introduction
+Artificial neural networks borrow from biology. Like their namesake, artificial neural networks model the neural connections present in our own brains. Nodes in a network are connected to inputs and outputs. Whether or not the output is activated depends on the inputs, the weight on those inputs, and the activation function. Putting many nodes together results in a network that is able to represent any function. What is learned or trained in an ANN are the weights on each input.
+
+\  
+\  
+
+# The Mushroom Data Set
+The data set by @Schlimmer:1987, retrieved from the UCI machine learning repository [@Lichman:2013], contains 8124 examples with 22 features representing 23 species of gilled mushrooms. The labels are whether the mushroom is edible or poisonous:
+
+  1. cap-shape: bell=b,conical=c,convex=x,flat=f, knobbed=k,sunken=s
+  2. cap-surface: fibrous=f,grooves=g,scaly=y,smooth=s
+  3. cap-color: brown=n,buff=b,cinnamon=c,gray=g,green=r, pink=p,purple=u,red=e,white=w,yellow=y
+  4. bruises?: bruises=t,no=f
+  5. odor: almond=a,anise=l,creosote=c,fishy=y,foul=f, musty=m,none=n,pungent=p,spicy=s
+  6. gill-attachment: attached=a,descending=d,free=f,notched=n
+  7. gill-spacing: close=c,crowded=w,distant=d
+  8. gill-size: broad=b,narrow=n
+  9. gill-color: black=k,brown=n,buff=b,chocolate=h,gray=g, green=r,orange=o,pink=p,purple=u,red=e, white=w,yellow=y
+  10. stalk-shape: enlarging=e,tapering=t
+  11. stalk-root: bulbous=b,club=c,cup=u,equal=e, rhizomorphs=z,rooted=r,missing=?
+  12. stalk-surface-above-ring: fibrous=f,scaly=y,silky=k,smooth=s
+  13. stalk-surface-below-ring: fibrous=f,scaly=y,silky=k,smooth=s
+  14. stalk-color-above-ring: brown=n,buff=b,cinnamon=c,gray=g,orange=o, pink=p,red=e,white=w,yellow=y
+  15. stalk-color-below-ring: brown=n,buff=b,cinnamon=c,gray=g,orange=o, pink=p,red=e,white=w,yellow=y
+  16. veil-type: partial=p,universal=u
+  17. veil-color: brown=n,orange=o,white=w,yellow=y
+  18. ring-number: none=n,one=o,two=t
+  19. ring-type: cobwebby=c,evanescent=e,flaring=f,large=l, none=n,pendant=p,sheathing=s,zone=z
+  20. spore-print-color: black=k,brown=n,buff=b,chocolate=h,green=r, orange=o,purple=u,white=w,yellow=y
+  21. population: abundant=a,clustered=c,numerous=n, scattered=s,several=v,solitary=y
+  22. habitat: grasses=g,leaves=l,meadows=m,paths=p, urban=u,waste=w,woods=d
+
+\  
+\  
+
+# Exploratory Data Analysis
+The purpose of exploring the data first is to get familiar with it and to see if anything is of interest.
+```{r}
+shroom <- read.csv("agaricus-lepiota.csv") # Read in the data
+```
+
+```{r}
+str(shroom)
+```
+
+```{r}
+lapply(shroom, summary)
+```
+
+\  
+
+Immediately noticed is that veil type only has one factor and stock root is missing in 2480 examples. Other than that the data looks good.
+
+\  
+\  
+
+# Data Preprocessing
+### Drop Veil Type
+The veil type is a constant, so drop it from the data set.
+```{r}
+shroom <- subset(x = shroom, select = -veil.type) # Drop veil.type column
+```
+
+\  
+
+### Handle Missing Values
+In this case, stalk root contains many missing values. There are many different ways to handle this type of data, in this example the missing data is turned into a factor called "u" for unknown.
+```{r}
+table(shroom$stalk.root) # Inspect
+```
+
+```{r}
+levels(shroom$stalk.root) <- c("u", "b", "c", "e", "r") # Convert
+```
+
+```{r}
+table(shroom$stalk.root) # Inspect
+```
+
+\  
+\  
+
+# The Artificial Neural Network
+### Create Numeric Data
+The ANN algorithm requires all data to be numeric, including the outputs (labels).
+```{r}
+shroom_numeric <- as.data.frame(lapply(shroom, as.numeric)) # Change all rows to numeric
+```
+
+```{r}
+str(shroom_numeric)
+```
+
+\  
+
+### Split the Data Between Testing and Training
+```{r}
+set.seed(77)                                                          # Get the same data each time
+idx <- sample(nrow(shroom_numeric), round(nrow(shroom_numeric)*0.7))  # Create 2 subsets with ratio 70:30
+shroom_train <- shroom_numeric[idx, ]                                 # Training subset
+shroom_test <- shroom_numeric[-idx, ]                                 # Testing subset
+```
+
+\  
+
+### Train the Model
+```{r}
+shroom_model <- neuralnet(class ~ cap.shape +
+                                  cap.surface +
+                                  cap.color +
+                                  bruises +
+                                  odor +
+                                  gill.attachment +
+                                  gill.spacing +
+                                  gill.size +
+                                  gill.color +
+                                  stalk.shape +
+                                  stalk.root +
+                                  stalk.surface.above.ring +
+                                  stalk.surface.below.ring +
+                                  stalk.color.above.ring +
+                                  stalk.color.below.ring +
+                                  veil.color +
+                                  ring.number +
+                                  ring.type +
+                                  spore.print.color +
+                                  population +
+                                  habitat,
+                                  data = shroom_train)
+```
+
+```{r fig.cap="Figure 1: Simple Neural Network Architecture", fig.align='center'}
+plot(shroom_model, rep="best")
+```
+
+\  
+
+### Test the Model
+```{r}
+shroom_pred <- compute(shroom_model, shroom_test[,2:ncol(shroom_test)])
+```
+
+\  
+
+### Evaluating Performance
+The output of the ANN is not binary, so round the outputs to get the binary classification.
+```{r}
+tail(shroom_pred$net.result) # Either 'close' to 1 or 'close' to 2, not binary
+```
+
+```{r}
+# Returns the percentage of correct predictions
+# Rounds the predictions first (non binary)
+get.accuracy <- function(prediction, real) {
+  prediction <- round(prediction) 
+  accuracy <- prediction == real
+  return (length(accuracy[accuracy == TRUE])/length(accuracy))
+}
+```
+
+```{r}
+get.accuracy(shroom_pred$net.result, shroom_test$class)
+```
+
+\  
+
+## Tweaking Hyperparameters
+There are many neural network hyperparameters or 'knobs' to try tweaking to get better accuracy. The SVM [LINK] classified this data set with 100% accuracy, so the neural network should be able to do the same.
+
+\  
+
+### Adjusting the Network by Adding Hidden Nodes
+```{r}
+# Returns the accuracy of a neural net with N nodes
+add.hidden.nodes <- function(hidden_nodes, train, test, test_cl) {
+  # Aggregate results
+  n <- c()
+  a <- c()
+
+  for (nodes in hidden_nodes) {
+    # Train
+    model <- neuralnet(class ~ cap.shape + 
+                               cap.surface + 
+                               cap.color + 
+                               bruises + 
+                               odor + 
+                               gill.attachment + 
+                               gill.spacing + 
+                               gill.size + 
+                               gill.color + 
+                               stalk.shape + 
+                               stalk.root + 
+                               stalk.surface.above.ring + 
+                               stalk.surface.below.ring + 
+                               stalk.color.above.ring + 
+                               stalk.color.below.ring + 
+                               veil.color + ring.number +
+                               ring.type + spore.print.color + 
+                               population + 
+                               habitat, 
+                               data = train, 
+                               hidden = nodes)
+    
+    # Test
+    prediction <- compute(model, test)
+    
+    # Evaluate
+    accuracy <- get.accuracy(prediction$net.result, test_cl)
+    
+    # Aggregate results
+    n <- c(n, nodes)
+    a <- c(a, accuracy)
+  }
+
+  return (as.data.frame(list("Nodes" = n, "Accuracy" = a)))
+}
+```
+
+```{r}
+#add.hidden.nodes(c(0, 2, 4, 6), shroom_train, shroom_test[,2:ncol(shroom_test)], shroom_test$class)
+```
+
+\  
+
+### Adjusting the Network by Adding a Hidden Layer
+```{r}
+# Train an ANN with 2 hidden layers
+# The first layer with 4 nodes
+# The second layer with 2 nodes
+shroom_model_layered <- neuralnet(class ~ cap.shape +
+                                  cap.surface + 
+                                  cap.color + 
+                                  bruises + 
+                                  odor + 
+                                  gill.attachment +
+                                  gill.spacing +
+                                  gill.size +
+                                  gill.color +
+                                  stalk.shape + 
+                                  stalk.root + 
+                                  stalk.surface.above.ring + 
+                                  stalk.surface.below.ring + 
+                                  stalk.color.above.ring +
+                                  stalk.color.below.ring + 
+                                  veil.color + ring.number + 
+                                  ring.type + spore.print.color + 
+                                  population + 
+                                  habitat, 
+                                  data = shroom_train, 
+                                  hidden = c(4, 2))
+```
+
+```{r fig.cap="Figure 2: Neural Network Architecture with Multiple Layers", fig.align='center'}
+plot(shroom_model_layered, rep="best")
+```
+
+```{r}
+# Test the model
+shroom_pred_layered <- compute(shroom_model_layered, shroom_test[,2:ncol(shroom_test)])
+```
+
+```{r}
+# Evaluate performance
+get.accuracy(shroom_pred_layered$net.result, shroom_test$class)
+```
+
+\  
+
+## Improving the Input
+The architecture of an ANN can also be influenced by the data. In this case, the examples in the mushroom data set contain only categorical features. Converting the data set into a sparse matrix using one-hot encoding provides another architecture to explore.
+
+### One-Hot Encoding
+```{r}
+shroom_oh_encoding <- onehot(shroom, max_levels = 12, stringsAsFactors = TRUE) # Get the encoding
+shroom_one_hot <- predict(shroom_oh_encoding, shroom) # Fill a sparse matrix
+```
+
+\  
+
+The `neuralnet` function requires explicitly typed features, so we can copy paste this output into the function argument.
+```{r}
+# Replace instances of '=', they confuse the nerualnet function call
+colnames(shroom_one_hot) <- gsub("=", ".", colnames(shroom_one_hot))
+input_names <- paste(names(shroom_one_hot[1,]), collapse = " + ")
+```
+
+```{r}
+input_names # View the output that can be used by neuralnet function
+```
+
+\  
+
+### Split the Data Between Testing and Training
+```{r}
+shroom_train_sparse <- shroom_one_hot[idx, ]   # Training subset
+shroom_test_sparse <- shroom_one_hot[-idx, ]   # Testing subset
+```
+
+\  
+
+### Train the Model
+Here, we are ignoring the class.p column because it does not provide any extra information. If the output is close to 1, it will be edible. If the output is closer to 0, it will be poisonous. Plotting this network would look messy with `ncol(shroom_test) - 2 = 116` inputs, so it is omitted.
+```{r}
+shroom_model_sparse <- neuralnet(class.e ~ cap.shape.b + cap.shape.c + cap.shape.f + cap.shape.k + cap.shape.s + cap.shape.x + cap.surface.f + cap.surface.g + cap.surface.s + cap.surface.y + cap.color.b + cap.color.c + cap.color.e + cap.color.g + cap.color.n + cap.color.p + cap.color.r + cap.color.u + cap.color.w + cap.color.y + bruises.f + bruises.t + odor.a + odor.c + odor.f + odor.l + odor.m + odor.n + odor.p + odor.s + odor.y + gill.attachment.a + gill.attachment.f + gill.spacing.c + gill.spacing.w + gill.size.b + gill.size.n + gill.color.b + gill.color.e + gill.color.g + gill.color.h + gill.color.k + gill.color.n + gill.color.o + gill.color.p + gill.color.r + gill.color.u + gill.color.w + gill.color.y + stalk.shape.e + stalk.shape.t + stalk.root.u + stalk.root.b + stalk.root.c + stalk.root.e + stalk.root.r + stalk.surface.above.ring.f + stalk.surface.above.ring.k + stalk.surface.above.ring.s + stalk.surface.above.ring.y + stalk.surface.below.ring.f + stalk.surface.below.ring.k + stalk.surface.below.ring.s + stalk.surface.below.ring.y + stalk.color.above.ring.b + stalk.color.above.ring.c + stalk.color.above.ring.e + stalk.color.above.ring.g + stalk.color.above.ring.n + stalk.color.above.ring.o + stalk.color.above.ring.p + stalk.color.above.ring.w + stalk.color.above.ring.y + stalk.color.below.ring.b + stalk.color.below.ring.c + stalk.color.below.ring.e + stalk.color.below.ring.g + stalk.color.below.ring.n + stalk.color.below.ring.o + stalk.color.below.ring.p + stalk.color.below.ring.w + stalk.color.below.ring.y + veil.color.n + veil.color.o + veil.color.w + veil.color.y + ring.number.n + ring.number.o + ring.number.t + ring.type.e + ring.type.f + ring.type.l + ring.type.n + ring.type.p + spore.print.color.b + spore.print.color.h + spore.print.color.k + spore.print.color.n + spore.print.color.o + spore.print.color.r + spore.print.color.u + spore.print.color.w + spore.print.color.y + population.a + population.c + population.n + population.s + population.v + population.y + habitat.d + habitat.g + habitat.l + habitat.m + habitat.p + habitat.u + habitat.w, data = shroom_train_sparse)
+```
+
+\  
+
+### Test the Model
+```{r}
+shroom_pred_sparse <- compute(shroom_model_sparse, shroom_test_sparse[,3:ncol(shroom_test_sparse)])
+```
+
+\  
+
+### Evaluating Performance
+```{r}
+get.accuracy(shroom_pred_sparse$net.result, shroom_test_sparse[,1])
+```
+
+\  
+\  
+
+# Conclusion
+Artificial Neural Networks have many hyperparameters to tune. Also, there are many different possible architectures. The data can also effect the results of an ANN, depending on their form. The complexity and flexibility of ANNs make them suited for many different types of machine learning problems. But the complexity also makes them more difficult and time consuming to work with.
+
+# References

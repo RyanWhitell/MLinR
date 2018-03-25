@@ -1,0 +1,264 @@
+---
+title: "Reinforcement Learning"
+author: "Ryan Whitell"
+output:
+  html_document: default
+subtitle: Solving the Tower of Hanoi and Playing Tic-Tac-Toe
+---
+```{r message=FALSE}
+# Packages Required
+library(ReinforcementLearning) # For everything
+```
+
+\  
+\  
+
+# Introduction
+Reinforcement learning is a more diverse area of machine learning than supervised and unsupervised learning. The simple idea behind reinforcement learning comes from behaviorist psychology. That is, in some state, an agent will take some action that it has learned will maximize its instant or future reward. There are many different types of reinforcement learning problems and many different types of algorithms to solve them. Using the `ReinforcementLearning` package in R, a policy can be learned from examples of state-action-reward transitions.
+
+# Tic-Tac-Toe
+The `tictactoe` data set contains examples of moves in the game Tic-Tac-Toe. It provides information on the rewards given by taking some action in some state. It also maps actions to next states. With many examples, a policy is produced:
+```{r message=FALSE}
+# Load Dataset
+data("tictactoe")
+head(tictactoe)
+
+# Define reinforcement learning parameters
+control <- list(alpha = 0.2, gamma = 0.4, epsilon = 0.1)
+
+# Learn a policy using the data
+model <- ReinforcementLearning(tictactoe, 
+                               s = "State", 
+                               a = "Action", 
+                               r = "Reward", 
+                               s_new = "NextState", 
+                               iter = 1, 
+                               control = control)
+
+# Print the policy
+head(policy(model))
+
+# Get an action via the policy
+get.move <- function(state){
+  return (model$Policy[attr(model$Policy, "names") == state][[1]])
+}
+
+# Play a game where player 2 avoids a loss
+# Opening move
+get.move(".........")
+
+# Plater 2 Plays c9
+get.move("....X...B")
+
+# Player 2 Plays c3 to avoid loss
+get.move("..B.X.X.B")
+
+# Player 2 Plays c4 to avoid loss
+get.move("..BBXXX.B")
+
+# All remaining moves lead to a draw
+```
+
+# Tower of Hanoi
+The Tower of Hanoi is a famous math puzzle where the objective is to move `D` differently sized disks from one of `P` pegs by only moving one disk at a time and never staking large disks on top of smaller disks. Instead of learning from data, the environment can be defined in such a way that states and actions are mapped based off certain rules:
+```{r message=FALSE}
+# Initial Conditions
+disks <- 3
+pegs <- 3
+
+# Sets the actions
+# For example, the 3 disk and 3 peg game would have 3(3-1) legal moves
+# Moves are described using 1 (to) and -1 (from)
+# -1,0,1
+# The disk moves from the 0 peg to the 2 peg
+set.actions <- function(pegs) {
+  
+  # N(N-1) is the number of legal moves
+  # Independent of game state
+  num_actions <- pegs*(pegs-1)
+  
+  if (pegs == 0 || pegs == 1) {return(0)}
+  
+  actions <- matrix(0, num_actions, pegs)
+  
+  move <- pegs
+  
+  # Create a matrix describing every legal move
+  for (i in 1:num_actions) {
+    j <- ceiling(i/(pegs-1))
+    actions[i,j] <- -1
+    if (move != j) {
+      actions[i,move] <- 1
+    }
+    move <- move - 1
+    if (move == 0) {move <- pegs}
+  }
+
+  actions_string <- c()
+    
+  # Convert the matrix into a vector of strings
+  for (i in 1:num_actions) {
+    string <- ""
+    for (j in 1:pegs) {
+      string <- paste(string, toString(actions[i,j]), sep = ",")
+    }
+    string <- substring(string, 2)
+    actions_string <- c(actions_string, string)
+  }
+
+  return(actions_string)
+}
+
+# Sets the states
+# For example, the 3 disk and 3 peg game would have 3^3 possible states
+# Each peg location is represented by a place in base 3
+# Size of the pegs goes from smallest to largest
+# 0 0 2
+# The largest disk is at peg 2, other 2 disks are at peg 0
+set.states <- function(pegs, disks) {
+  states <- c()
+  
+  for (i in 0:((pegs^disks)-1)) {
+
+    locations <- integer(disks)
+    
+    for (j in 1:disks) {
+      locations[j] <- i %% pegs
+      i <- i %/% pegs
+    }
+    
+    states <- c(states, toString(locations))
+    
+  }
+  
+  return(states)
+}
+
+# All possible states
+states <- set.states(pegs, disks)
+
+# All possible actions
+actions <- set.actions(pegs)
+
+# Environment function maps states and actions to rewards and next states
+env <- function(state, action) {
+  action <- scan(text = action, sep = ",", quiet = TRUE)
+  state <- scan(text = state, sep = ",", quiet = TRUE)
+  
+  action_from <- match(-1, action)-1
+  action_to <- match(1, action)-1
+  
+  smallest_disk_at_from <- match(action_from, state)
+  smallest_disk_at_to <- match(action_to, state)
+
+  # Invalid - there is no disk to move, heavily penalize to discourage
+  if (is.na(smallest_disk_at_from)) 
+  {
+    return (list(NextState = toString(state), Reward = -7000000))
+  }
+  
+  # Invalid - the disk to move would sit on a smaller disk, heavily penalize to discourage
+  if (smallest_disk_at_from > smallest_disk_at_to && !is.na(smallest_disk_at_to)) 
+  {
+    return (list(NextState = toString(state), Reward = -7000000))
+  }
+  
+  next_state <- state
+  next_state[smallest_disk_at_from] <- action_to
+  
+  pegs <- length(action)
+  disks <- length(state)
+  
+  final_state <- rep((pegs-1), disks)
+  
+  final_state <- toString(final_state)
+  next_state <- toString(next_state)
+  
+  if (next_state == final_state) {
+    return (list(NextState = final_state, Reward = ((pegs-1)^disks)))
+  }
+  
+  return (list(NextState = next_state, Reward = -1))
+}
+
+# Get examples of possible moves
+data <- sampleExperience(N = length(actions)*length(states)*10, 
+                         env = env, 
+                         states = states, 
+                         actions = actions)
+head(data)
+
+# Define reinforcement learning parameters
+control <- list(alpha = 0.3, gamma = 0.7, epsilon = 0.2)
+
+# Learn the policy
+model <- ReinforcementLearning(data, 
+                               s = "State", 
+                               a = "Action",
+                               r = "Reward",
+                               s_new = "NextState",
+                               control = control)
+
+# Use the model to produce more meaningful data 
+# via an algorithm that follows the learned policy
+# It will randomly take a different action with probability: epsilon
+data_new <- sampleExperience(N = length(actions)*length(states)*10,
+                             env = env, 
+                             states = states,
+                             actions = actions,
+                             model = model, 
+                             actionSelection = "epsilon-greedy",
+                             control = control)
+
+model <- ReinforcementLearning(data_new, 
+                               s = "State", 
+                               a = "Action", 
+                               r = "Reward", 
+                               s_new = "NextState", 
+                               control = control, 
+                               model = model)
+
+# Get an action via the policy
+get.action <- function(state){
+  
+  state <- scan(text = state, sep = ",", quiet = TRUE)
+  fixed_state <- paste("X", toString(state[1]), sep = "")
+  
+  for(i in state[-1]) {
+    fixed_state <- paste(fixed_state, toString(i), sep = "..")
+  }
+  
+  return (model$Policy[attr(model$Policy, "names") == fixed_state][[1]])
+}
+
+# Play the game
+play.game <- function() {
+  state = states[1]
+  reward <- 0
+  
+  final_state <- rep((pegs-1), disks)
+  final_state <- toString(final_state)
+  
+  stop_condition = FALSE
+  
+  actions <- c()
+  
+  while(!stop_condition) {
+    action <- get.action(state)
+    actions <- c(actions, action)
+    move <- env(state, action)
+    reward <- reward + move$Reward
+    state <- move$NextState
+    if (state == final_state || reward < (-pegs^disks)) {
+      stop_condition = TRUE
+    }
+  }
+  
+  return (actions)
+}
+
+play.game()
+```
+
+# Conclusion
+This is the tip of the iceberg for for reinforcement learning. Using a large dataset of Tic-Tac-Toe moves, a policy was generated that can play the game optimally. Also, by defining the rules of Tower of Hanoi, a policy was generated that can solve the puzzle, theoretically, optimally.

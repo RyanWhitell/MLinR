@@ -1,0 +1,280 @@
+---
+title: "Evaluation Metrics"
+author: "Ryan Whitell"
+output:
+  html_document: default
+csl: apa.csl
+subtitle: Classifying Abalone Age
+bibliography: bibliography.bibtex
+---
+```{r message=FALSE}
+# Packages Required
+library(caret)    # Everything
+library(kernlab)  # Support Vector Machine
+library(RSNNS)    # Artificial Neural Network
+library(dummies)  # Dummy Variables
+library(doSNOW)   # Executing in Parallel
+```
+
+\  
+\  
+
+# Introduction
+Choosing the correct evaluation metrics are important when evaluating a model. Accuracy is a simple metric that is able to provide quick feedback for how good a model is, but for skewed data it can be misleading. For example, if the data contains 99990 examples with class '0' and 10 examples of class '1,' the model will be 99.99% accurate by always guessing '0.' As another example, take a neural net with 88 outputs indicating keys on a piano, if the ANN always guesses that no note is played (all zeros), it is still around 98% accurate.  
+
+There are many different metrics to consider, the best one depends on the goal of the model. In the case of cancer diagnosis, it is much better to lean towards a positive diagnosis even when there is no cancer (false positive) than to have a negative diagnosis when there is a presence of cancer (false negative). For spam detection, it is better to let some spam through if it means never blocking ham messages. The model should be evaluated based on the most important metric
+
+\  
+\  
+
+# The Albalone Data Set
+The data set by @nash:1994, retrieved from the UCI machine learning repository [@Lichman:2013], contains 4177 examples with 9 features describing an Abalone. The number of rings gives the age of the Abalone. The goal is to predict the age of the abalone using the other features, and not by counting the rings.
+
+| Name			    | Data Type | Meas.	| Description					          |
+|---------------|-----------|-------|-------------------------------|
+| Sex			      | nominal	  | 		  | M, F, and I (infant) 			    |
+| Length		    | continuous| mm	  | Longest shell measurement		  |
+| Diameter		  | continuous| mm	  | perpendicular to length		    |
+| Height		    | continuous| mm	  | with meat in shell			      |
+| Whole Weight	| continuous| grams	| whole abalone					        |
+| Shucked Weight| continuous| grams	| weight of meat				        |
+| Viscera Weight| continuous| grams	| gut weight (after bleeding)	  |
+| Shell Weight	| continuous| grams	| after being dried				      |
+| Rings			    | integer	  | 		  | +1.5 gives the age in years	  |
+
+\  
+\  
+
+# Exploratory Data Analysis
+The purpose of exploring the data first is to get familiar with it and to see if anything is of interest.
+```{r}
+abalone <- read.csv("abalone-data.csv") # Read in the data
+```
+
+```{r}
+str(abalone)
+```
+
+```{r}
+lapply(abalone, summary)
+```
+
+```{r fig.cap="Figure 1: Age Distribution", fig.align='center'}
+ggplot(data = abalone, aes(x = Rings+1.5)) + 
+  geom_histogram(binwidth = 1, color = 'black', fill = '#099DD9') +
+  scale_x_continuous(limits = c(0, 31), breaks = seq(0, 31, 1)) + 
+  xlab("Approx Age (years)") + 
+  ylab("Count")
+```
+
+\  
+
+There's is one interesting variable in the Sex feature, 'infant.' The number of rings for infants is in fact lower than that for males and females:
+```{r}
+by(abalone$Rings, abalone$Sex, summary)
+```
+
+\  
+\  
+
+# Data Preprocessing
+### Normalization
+The SVM and ANN work better with normalized numerical data.
+```{r}
+# Returns a normalized vector between max / min
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+```
+
+```{r}
+abalone$Length <- normalize(abalone$Length)
+abalone$Diameter <- normalize(abalone$Diameter)
+abalone$Height <- normalize(abalone$Height)
+abalone$Whole_W <- normalize(abalone$Whole_W)
+abalone$Shucked_W <- normalize(abalone$Shucked_W)
+abalone$Viscera_W <- normalize(abalone$Viscera_W)
+abalone$Shell_W <- normalize(abalone$Shell_W)
+```
+
+\  
+
+### Dummies
+The Sex feature is categorical so it should be split into dummy variables.
+```{r}
+# Create dummies out of the Sex feature
+abalone <- dummy.data.frame(abalone)
+```
+
+```{r}
+# Check the new features
+str(abalone)
+```
+
+```{r}
+# Remove the 'SexI' feature, (SexF == 0 & SexM == 0) is SexI
+abalone <- subset(abalone, select = -SexI)
+```
+
+\  
+
+### Add an Age Label
+Because we are doing classification instead of regression, we need to create age labels for different ages:
+
+  * 0 - 6:    Young
+  * 7 - 11:   Adult
+  * 12+:      Old
+
+```{r}
+# Create a new variable 'age,' add the recommended 1.5 to get years
+abalone$Age <- abalone$Rings+1.5
+
+# Aggregate into 3 labels
+abalone$Age <- cut(abalone$Age, breaks = c(0,7,12,31), labels = c("Young","Adult","Old"))
+```
+
+```{r}
+# Check the labels
+by(abalone$Rings+1.5, abalone$Age, table)
+```
+
+```{r}
+# Convert to factor
+abalone$Age <- as.factor(abalone$Age)
+
+# Remove the 'Rings' feature
+abalone <- subset(abalone, select = -Rings)
+```
+
+```{r}
+# Check the data
+lapply(abalone, summary)
+```
+
+\  
+
+### Split the Data Between Testing and Training
+The `caret` package __createDataPartition__ function will split the training and the test set in a way that preserves label proportions.
+```{r}
+set.seed(77)
+# Create the index using the caret package
+idx <- createDataPartition(abalone$Age,
+                          times = 1,
+                          p = 0.7,
+                          list = FALSE)
+# Split the data
+abalone_train <- abalone[idx,]
+abalone_test <- abalone[-idx,]
+```
+
+```{r}
+# Check proportions
+prop.table(table(abalone_train$Age))
+prop.table(table(abalone_test$Age))
+```
+
+\    
+\  
+
+# SVM
+### Train the Model
+Using the `caret` package, an SVM with a radial kernel will be tuned using 10 fold cross validation to find the best `Cost` and `Sigma`.
+```{r}
+# Run 10-fold cross validation 2 times with a grid search
+tuning_method <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 2,
+                              search = "grid")
+
+# Tune on 3x3 parameter combinations
+tuning_grid <- expand.grid(sigma = c(0.1, 1, 10),
+                           C = c(0.1, 1, 10))
+
+# Run 4 parallel instances to speed up execution
+cluster <- makeCluster(4, type = "SOCK")
+registerDoSNOW(cluster)
+
+# Train the model with the best cost and sigma found 
+# during 10 fold cross validation
+abalone_model <- caret::train(Age ~ ., 
+                       data = abalone_train, 
+                       method = "svmRadial",
+                       tuneGrid = tuning_grid,
+                       trControl = tuning_method)
+
+# Stop parallel instances
+stopCluster(cluster)
+
+# View best hyperparameters
+abalone_model
+```
+
+\  
+
+### Test
+```{r}
+abalone_pred <- predict(abalone_model, abalone_test)
+```
+
+\  
+
+### Evaluate
+```{r}
+caret::confusionMatrix(abalone_pred, abalone_test$Age)
+```
+
+\  
+\  
+
+# ANN
+### Train the Model
+Using the `caret` package, an ANN will be tuned using 10 fold cross validation to find the best combination of hidden neurons in three layers.
+```{r}
+# Tune on 3x3x3 parameter combinations
+tuning_grid <- expand.grid(layer1 = c(2, 4, 6),
+                           layer2 = c(2, 4, 6),
+                           layer3 = c(2, 4, 6))
+
+# Run 4 parallel instances to speed execution
+cluster <- makeCluster(4, type = "SOCK")
+registerDoSNOW(cluster)
+
+# Train the model with the best cost and sigma found 
+# during 10 fold cross validation
+abalone_model <- caret::train(Age ~ ., 
+                       data = abalone_train, 
+                       method = "mlpML",
+                       tuneGrid = tuning_grid,
+                       trControl = tuning_method)
+
+# Stop parallel instances
+stopCluster(cluster)
+
+# View best hyperparameters
+abalone_model
+```
+
+\  
+
+### Test
+```{r}
+abalone_pred <- predict(abalone_model, abalone_test)
+```
+
+\  
+
+### Evaluate
+```{r}
+caret::confusionMatrix(abalone_pred, abalone_test$Age)
+```
+
+\  
+\  
+
+# Conclusion
+The evaluation depends on the goal of the analysis. In this case, predicting the age of the abalone without going through the painstaking process of counting the rings. Depending on what needed to be known, the amount of categories to break the abalone ages into could have been different. Perhaps it is only useful to know if the abalone is passed a certain age; the other end of this spectrum would be a regression analysis to predict the age by year. Most examples in our training set (around 60%) were labeled as 'Adult.' What was labeled as 'Adult' however was arbitrarily chosen. There is a chance that what our model predicted as 'Adult' might have been a better indication of what makes an abalone an adult. By looking at the confusion matrix, it is clear that there is a useful threshold. We know this because 'Young' and 'Old' were never misclassified with each other. The confusion matrix provides an overview of how well a model performs, but it can also give some insight into the data as well. 
+
+\  
+\  
+
+# References

@@ -1,0 +1,25 @@
+Categorical Data: Features that are factors in R. Discrete features.
+
+Class: Output variable that is predicted.
+
+Data set: Collection of examples.
+
+Example: One row of the data set. Contains features and possibly a label.
+
+Feature Columns: Input variable used in making predictions.
+
+Hyperparameter: The "knobs" that you tweak during successive runs of training a model. For example, learning rate is a hyperparameter.
+
+Label | Target: The class column in an example.
+
+Model: The representation of what an ML system has learned from the training data.
+
+Parameter: A variable of a model that the ML system trains on its own. For example, weights are parameters whose values the ML system gradually learns through successive training iterations.
+
+Prediction: A model's output when provided with an input example.
+
+Test Set: The subset of the data set that you use to test your model after the model has gone through initial vetting by the validation set.
+
+Training Set: The subset of the data set used to train a model.
+
+Validation Set: A subset of the data set—disjunct from the training set—that you use to adjust hyperparameters.

@@ -1,0 +1,173 @@
+---
+title: "Support Vector Machines"
+author: "Ryan Whitell"
+output:
+  html_document: default
+csl: apa.csl
+subtitle: Predicting the Edibility of Mushrooms
+bibliography: bibliography.bibtex
+---
+```{r setup, include=FALSE}
+# Packages Required
+library(e1071)  # SVM
+```
+
+\  
+\  
+
+# Introduction
+Support Vector Machines are not really "machines" but more a clever algorithm with a simple concept that has a complicated implementation. The simple concept is just a hyperplane that separates classes with the widest possible margin between the hyperplane and closest data points. New examples will be classified by which side of the hyperplane (decision boundary) they fall. The complicated, and clever, implementation of this algorithm involves finding this hyperplane using vectors and quadratic programming. Basically, only the points closest to the decision boundary will be considered (the support vectors). For data sets that are not linearly separable, the kernel trick is used.
+
+\  
+\  
+
+# The Mushroom Data Set
+The data set by @Schlimmer:1987, retrieved from the UCI machine learning repository [@Lichman:2013] contains 8124 examples with 22 features representing 23 species of gilled mushrooms. The labels are whether the mushroom is edible or poisonous:
+
+  1. cap-shape: bell=b,conical=c,convex=x,flat=f, knobbed=k,sunken=s
+  2. cap-surface: fibrous=f,grooves=g,scaly=y,smooth=s
+  3. cap-color: brown=n,buff=b,cinnamon=c,gray=g,green=r, pink=p,purple=u,red=e,white=w,yellow=y
+  4. bruises?: bruises=t,no=f
+  5. odor: almond=a,anise=l,creosote=c,fishy=y,foul=f, musty=m,none=n,pungent=p,spicy=s
+  6. gill-attachment: attached=a,descending=d,free=f,notched=n
+  7. gill-spacing: close=c,crowded=w,distant=d
+  8. gill-size: broad=b,narrow=n
+  9. gill-color: black=k,brown=n,buff=b,chocolate=h,gray=g, green=r,orange=o,pink=p,purple=u,red=e, white=w,yellow=y
+  10. stalk-shape: enlarging=e,tapering=t
+  11. stalk-root: bulbous=b,club=c,cup=u,equal=e, rhizomorphs=z,rooted=r,missing=?
+  12. stalk-surface-above-ring: fibrous=f,scaly=y,silky=k,smooth=s
+  13. stalk-surface-below-ring: fibrous=f,scaly=y,silky=k,smooth=s
+  14. stalk-color-above-ring: brown=n,buff=b,cinnamon=c,gray=g,orange=o, pink=p,red=e,white=w,yellow=y
+  15. stalk-color-below-ring: brown=n,buff=b,cinnamon=c,gray=g,orange=o, pink=p,red=e,white=w,yellow=y
+  16. veil-type: partial=p,universal=u
+  17. veil-color: brown=n,orange=o,white=w,yellow=y
+  18. ring-number: none=n,one=o,two=t
+  19. ring-type: cobwebby=c,evanescent=e,flaring=f,large=l, none=n,pendant=p,sheathing=s,zone=z
+  20. spore-print-color: black=k,brown=n,buff=b,chocolate=h,green=r, orange=o,purple=u,white=w,yellow=y
+  21. population: abundant=a,clustered=c,numerous=n, scattered=s,several=v,solitary=y
+  22. habitat: grasses=g,leaves=l,meadows=m,paths=p, urban=u,waste=w,woods=d
+
+\  
+\  
+
+# Exploritory Data Analysis
+```{r}
+shroom <- read.csv("agaricus-lepiota.csv") # Read in the data
+str(shroom)
+lapply(shroom, summary)
+```
+
+\  
+
+Immediately noticed is that veil type only has one factor and stock root is missing in 2480 examples. Other than that the data looks good.
+
+\  
+\  
+
+# Data Preprocessing
+### Drop Veil Type
+The veil type is a constant, so drop it from the data set.
+```{r}
+shroom <- subset(x = shroom, select = -veil.type)
+```
+
+\  
+
+### Handle Missing Values
+In this case, stalk root contains many missing values. There are many different ways to handle this type of data, in this example the missing data is turned into a factor called "u" for unknown.
+```{r}
+table(shroom$stalk.root) # Inspect
+levels(shroom$stalk.root) <- c("u", "b", "c", "e", "r") # Convert
+table(shroom$stalk.root) # Inspect
+```
+
+\  
+
+### Create Numeric Data
+The SVM algorithm requires all data to be numeric.
+```{r}
+shroom <- as.data.frame(lapply(shroom, as.numeric)) # Change all rows to numeric
+shroom$class <- factor(shroom$class)                # Convert class back to factor
+levels(shroom$class) <- c("e", "p")                 # Re-label class factors
+str(shroom)
+```
+
+\  
+\  
+
+# The Support Vector Machine
+### Splitting the Data Between Testing and Training
+```{r}
+set.seed(77)                                          # Get the same data each time
+idx <- sample(nrow(shroom), round(nrow(shroom)*0.7))  # Create 2 samples with ratio 70:30
+shroom_train <- shroom[idx, ]                         # Split 70%
+shroom_test <- shroom[-idx, ]                         # Split 30%
+```
+
+\  
+
+### Train the Model
+```{r}
+shroom_model <- svm(formula = class ~ ., data = shroom_train, kernel = "linear")
+summary(shroom_model)
+```
+
+\  
+
+### Test the Model
+```{r}
+shroom_pred <- predict(shroom_model, shroom_test)
+summary(shroom_pred)
+```
+
+\  
+
+### Evaluating Accuracy
+```{r}
+# Create an accuracy function
+get.accuracy <- function(prediction, real) {
+  accuracy <- prediction == real
+  return (length(accuracy[accuracy == TRUE])/length(accuracy))
+}
+get.accuracy(shroom_pred, shroom_test$class)
+```
+
+\  
+
+### Different Kernels
+Different kernels may provide better or worse performance. Picking the right kernel requires a bit of domain knowledge. Knowing what features make elements similar can provide insight into which kernel should be applied.
+```{r}
+kernels <- c("linear", "polynomial", "radial", "sigmoid")
+all.kernels <- function(kernel) {
+  shroom_model <- svm(formula = class ~ ., data = shroom_train, kernel = kernel)
+  shroom_pred <- predict(shroom_model, shroom_test)
+  return(get.accuracy(shroom_pred, shroom_test$class))
+}
+kernel_accuracy <- unlist(lapply(kernels, all.kernels))
+kernel_accuracy*100
+```
+
+\  
+
+Polynomial and radial kernels provide 100% classification accuracy on this data set. The sigmoid kernel performance is poor.
+
+\  
+
+### Tuning
+The `tune.svn` function will run N-fold cross validation for different hyperparameters in a specified range. In this case, performance with polynomial and radial kernels are 100% and tuning is not necessary. It is an expensive operation, so this example only checks 3 different values for the 'cost' and 'gamma' hyperparameters for reference.
+```{r}
+#shroom_tune_params <- tune.svm(class ~ ., data = shroom_train, gamma = 2^(-1:1), cost = 2^(-1:1))
+#summary(shroom_tune_params)
+#plot(shroom_tune_params)
+```
+
+\  
+\  
+
+# Conclusion
+For this data set, the support vector machine black box was able to classify mushrooms as either edible or poisonous with 100% accuracy. This does not mean SVMs are always 100% accurate, it means that the data itself contained highly correlated features.
+
+\  
+\  
+
+# References
