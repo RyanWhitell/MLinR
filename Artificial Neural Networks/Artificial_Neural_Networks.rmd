@@ -55,11 +55,10 @@ The data set by @Schlimmer:1987, retrieved from the UCI machine learning reposit
 The purpose of exploring the data first is to get familiar with it and to see if anything is of interest.
 ```{r}
 shroom <- read.csv("agaricus-lepiota.csv") # Read in the data
-```
-
-```{r}
 str(shroom)
 ```
+
+\  
 
 ```{r}
 lapply(shroom, summary)
@@ -87,11 +86,10 @@ In this case, stalk root contains many missing values. There are many different 
 table(shroom$stalk.root) # Inspect
 ```
 
-```{r}
-levels(shroom$stalk.root) <- c("u", "b", "c", "e", "r") # Convert
-```
+\  
 
 ```{r}
+levels(shroom$stalk.root) <- c("u", "b", "c", "e", "r") # Convert
 table(shroom$stalk.root) # Inspect
 ```
 
@@ -103,9 +101,6 @@ table(shroom$stalk.root) # Inspect
 The ANN algorithm requires all data to be numeric, including the outputs (labels).
 ```{r}
 shroom_numeric <- as.data.frame(lapply(shroom, as.numeric)) # Change all rows to numeric
-```
-
-```{r}
 str(shroom_numeric)
 ```
 
@@ -147,6 +142,8 @@ shroom_model <- neuralnet(class ~ cap.shape +
                                   data = shroom_train)
 ```
 
+\  
+
 ```{r fig.cap="Figure 1: Simple Neural Network Architecture", fig.align='center'}
 plot(shroom_model, rep="best")
 ```
@@ -161,10 +158,12 @@ shroom_pred <- compute(shroom_model, shroom_test[,2:ncol(shroom_test)])
 \  
 
 ### Evaluating Performance
-The output of the ANN is not binary, so round the outputs to get the binary classification.
+The output of this ANN is not binary, so round the outputs to get the binary classification.
 ```{r}
 tail(shroom_pred$net.result) # Either 'close' to 1 or 'close' to 2, not binary
 ```
+
+\  
 
 ```{r}
 # Returns the percentage of correct predictions
@@ -176,6 +175,8 @@ get.accuracy <- function(prediction, real) {
 }
 ```
 
+\  
+
 ```{r}
 get.accuracy(shroom_pred$net.result, shroom_test$class)
 ```
@@ -183,7 +184,7 @@ get.accuracy(shroom_pred$net.result, shroom_test$class)
 \  
 
 ## Tweaking Hyperparameters
-There are many neural network hyperparameters or 'knobs' to try tweaking to get better accuracy. The SVM [LINK] classified this data set with 100% accuracy, so the neural network should be able to do the same.
+There are many neural network hyperparameters or 'knobs' to try tweaking to get better results.
 
 \  
 
@@ -234,8 +235,10 @@ add.hidden.nodes <- function(hidden_nodes, train, test, test_cl) {
 }
 ```
 
+\  
+
 ```{r}
-#add.hidden.nodes(c(0, 2, 4, 6), shroom_train, shroom_test[,2:ncol(shroom_test)], shroom_test$class)
+add.hidden.nodes(c(0, 2, 4, 6), shroom_train, shroom_test[,2:ncol(shroom_test)], shroom_test$class)
 ```
 
 \  
@@ -268,16 +271,18 @@ shroom_model_layered <- neuralnet(class ~ cap.shape +
                                   hidden = c(4, 2))
 ```
 
+\  
+
 ```{r fig.cap="Figure 2: Neural Network Architecture with Multiple Layers", fig.align='center'}
 plot(shroom_model_layered, rep="best")
 ```
 
+\  
+
 ```{r}
 # Test the model
 shroom_pred_layered <- compute(shroom_model_layered, shroom_test[,2:ncol(shroom_test)])
-```
 
-```{r}
 # Evaluate performance
 get.accuracy(shroom_pred_layered$net.result, shroom_test$class)
 ```
@@ -300,9 +305,6 @@ The `neuralnet` function requires explicitly typed features, so we can copy past
 # Replace instances of '=', they confuse the nerualnet function call
 colnames(shroom_one_hot) <- gsub("=", ".", colnames(shroom_one_hot))
 input_names <- paste(names(shroom_one_hot[1,]), collapse = " + ")
-```
-
-```{r}
 input_names # View the output that can be used by neuralnet function
 ```
 
@@ -341,5 +343,8 @@ get.accuracy(shroom_pred_sparse$net.result, shroom_test_sparse[,1])
 
 # Conclusion
 Artificial Neural Networks have many hyperparameters to tune. Also, there are many different possible architectures. The data can also effect the results of an ANN, depending on their form. The complexity and flexibility of ANNs make them suited for many different types of machine learning problems. But the complexity also makes them more difficult and time consuming to work with.
+
+\  
+\  
 
 # References

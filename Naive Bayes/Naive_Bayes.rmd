@@ -8,7 +8,7 @@ subtitle: Filtering SMS Spam
 bibliography: bibliography.bibtex
 ---
 
-```{r setup, include=FALSE}
+```{r message=FALSE}
 # Packages Required
 library(tm)         # Text Mining
 library(SnowballC)  # Word Stemming
@@ -21,7 +21,6 @@ library(gmodels)    # Cross Table
 \  
 
 # Introduction
-
 Naïve Bayes classifiers use Bayes rule to classify data using the probabilities gleaned from existing data or new data as it becomes available. Naïve Bayes is very good at text classification even with minimal data preprocessing or wrangling. 
 
 \  
@@ -67,13 +66,11 @@ For a given set of words (a new SMS message), the posterior probabilities are de
 \  
 
 # Text Transformation
-
 Before training a model, the data needs to transformed into a more useful form. The `tm` package in R provides functions for transforming and manipulating text data.
 
 \  
 
-##### Import the data.
-
+##### Import the data
 ```{r}
 sms_raw <- read.table(file = "SMSSpamCollection.tsv", header = FALSE, sep = "\t", quote = "", colClasses = "character")
 str(sms_raw)
@@ -81,8 +78,7 @@ str(sms_raw)
 
 \  
 
-##### Rename the columns, change type to a factor. Check out the values of ham and spam.
-
+##### Rename the columns, change type to a factor. Check out the values of ham and spam
 ```{r}
 colnames(sms_raw) <- c('type', 'text')
 sms_raw$type <- factor(sms_raw$type)
@@ -91,29 +87,27 @@ table(sms_raw$type)
 
 \  
 
-##### Visualize the data in a wordcloud.
-
-```{r}
-spam <- subset(sms_raw, type == "spam")
-ham <- subset(sms_raw, type == "ham")
-```
-
+##### Visualize the data in a wordcloud
 ```{r warning = FALSE, fig.cap="Figure 1: Common Spam Words", fig.align='center'}
+spam <- subset(sms_raw, type == "spam")
+ham <- subset(sms_raw, type == "ham") 
 wordcloud(spam$text, max.words = 40, scale = c(3,0.5), random.order = FALSE)
 ```
+
+\  
 
 ```{r warning = FALSE, fig.cap="Figure 2: Common Ham Words", fig.align='center'}
 wordcloud(ham$text, max.words = 40, scale = c(3,0.5), random.order = FALSE)
 ```
 
+\  
+
 It is clear that it should be possible to distinguish between ham and spam SMS messages from these word clouds. Words like 'free,' 'prize,' and 'call' are good indicators of spam messages. 
 
 \  
 
-##### Transform the data using the tm package.
-
+##### Transform the data using the tm package
 First, create a corpus. A corpus is a collection of text documents.
-
 ```{r}
 sms_corpus <- VCorpus(VectorSource(sms_raw$text))
 sms_corpus
@@ -121,76 +115,115 @@ sms_corpus
 
 \  
 
-##### Change all words to lower case.
-
+##### Change all words to lower case
 ```{r}
 as.character(sms_corpus[[10]])
+```
+
+\  
+
+```{r}
 sms_corpus_clean <- tm_map(sms_corpus, content_transformer(tolower))
 as.character(sms_corpus_clean[[10]])
 ```
 
 \  
 
-##### Remove word stems.
-
+##### Remove word stems
 ```{r}
 as.character(sms_corpus_clean[[10]])
+```
+
+\  
+
+```{r}
 sms_corpus_clean <- tm_map(sms_corpus_clean, stemDocument)
 as.character(sms_corpus_clean[[10]])
 ```
 
 \  
 
-##### Remove stop words.
-
+##### Remove stop words
 ```{r}
 as.character(sms_corpus_clean[[10]])
+```
+
+\  
+
+```{r}
 sms_corpus_clean <- tm_map(sms_corpus_clean, removeWords, stopwords())
 as.character(sms_corpus_clean[[10]])
 ```
 
 \  
 
-##### Remove numbers.
-
+##### Remove numbers
 ```{r}
 as.character(sms_corpus_clean[[10]])
+```
+
+\  
+
+```{r}
 sms_corpus_clean <- tm_map(sms_corpus_clean, removeNumbers)
 as.character(sms_corpus_clean[[10]])
 ```
 
 \  
 
-##### Remove punctuation.
-
+##### Remove punctuation
 ```{r}
+# Replaces punctuation with spaces
 replacePunctuation <- function(x) {
   gsub("[[:punct:]]+", " ", x)
 }
+```
+
+\  
+
+```{r}
 as.character(sms_corpus_clean[[10]])
+```
+
+\  
+
+```{r}
 sms_corpus_clean <- tm_map(sms_corpus_clean, replacePunctuation)
 as.character(sms_corpus_clean[[10]])
 ```
 
 \  
 
-##### Remove white space.
-
+##### Remove white space
 ```{r}
 as.character(sms_corpus_clean[[10]])
+```
+
+\  
+
+```{r}
 sms_corpus_clean <- tm_map(sms_corpus_clean, stripWhitespace)
 as.character(sms_corpus_clean[[10]])
 ```
 
 \  
 
-##### Check a few examples.
-
+##### Check a few examples
 ```{r}
 as.character(sms_corpus[[20]])
 as.character(sms_corpus_clean[[20]])
+```
+
+\  
+
+```{r}
 as.character(sms_corpus[[30]])
 as.character(sms_corpus_clean[[30]])
+```
+
+\  
+
+```{r}
 as.character(sms_corpus[[40]])
 as.character(sms_corpus_clean[[40]])
 ```
@@ -203,11 +236,8 @@ It looks like the text data is in a more usable form.
 \  
 
 # Data Preprocessing
-
 ### Create a Document-Term-Matrix
-
 Document-term-matrices describe the frequency of all the terms present in a corpus for each individual document. This is the type of form needed for Naïve Bayes.
- 
 ```{r}
 sms_corpus_clean <- tm_map(sms_corpus_clean, PlainTextDocument) # Convert back to the correct data type
 sms_dtm <- DocumentTermMatrix(sms_corpus_clean)
@@ -216,14 +246,17 @@ sms_dtm <- DocumentTermMatrix(sms_corpus_clean)
 \  
 
 ### Split the Data
-
 The data itself is random so splitting the training and testing sets randomly is as simple as splitting at 75%. 
-
 ```{r}
 # Train
 sms_dtm_train <- sms_dtm[1:4180, ]            # 75%
 sms_train_labels <- sms_raw[1:4180, ]$type    # Labels
 prop.table(table(sms_train_labels))           # Check
+```
+
+\  
+
+```{r}
 # Test
 sms_dtm_test <- sms_dtm[4181:5574, ]          # 25%
 sms_test_labels <- sms_raw[4181:5574, ]$type  # Labels
@@ -232,13 +265,14 @@ prop.table(table(sms_test_labels))            # Check
 
 \  
 
-### Check the frequent words
-
+### Check the Frequent Words
 ```{r}
 # Frequent words in spam
 sms_spam_freq <- sort(colSums(as.matrix(sms_dtm_train[sms_train_labels=="spam",])), decreasing=TRUE)
 head(sms_spam_freq, 5)
 ```
+
+\  
 
 ```{r}
 # Frequent words in ham
@@ -248,13 +282,14 @@ head(sms_ham_freq, 5)
 
 \  
 
-### Remove the infrequent words
-
+### Remove the Infrequent Words
 ```{r}
 # Infrequent words in spam
 sms_spam_freq <- sort(colSums(as.matrix(sms_dtm_train[sms_train_labels=="spam",])), decreasing=FALSE)
 head(sms_spam_freq, 5)
 ```
+
+\  
 
 ```{r}
 # Infrequent words in ham
@@ -262,8 +297,9 @@ sms_ham_freq <- sort(colSums(as.matrix(sms_dtm_train[sms_train_labels=="ham",]))
 head(sms_ham_freq, 5)
 ```
 
-Remove words that appear in less than 5 SMS messages
+\  
 
+### Remove words that appear in less than 5 SMS messages
 ```{r}
 sms_freq_words <- findFreqTerms(sms_dtm_train, 5)
 sms_dtm_train <- sms_dtm_train[ , sms_freq_words]
@@ -272,14 +308,18 @@ sms_dtm_test <- sms_dtm_test[ , sms_freq_words]
 
 \  
 
-### Convert numerical to categorical
-
+### Convert Numerical to Categorical
 The Naïve Bayes classifier needs to know if the document contains the word or not, it does not matter how many times the word is present.
-
 ```{r}
+# Converts the frequency to "Yes" if greater than 0, "No" otherwise
 convert_counts <- function(x) {
   x <- ifelse(x > 0, "Yes", "No")
 }
+```
+
+\  
+
+```{r}
 sms_train <- apply(sms_dtm_train, MARGIN = 2, convert_counts)
 sms_test <- apply(sms_dtm_test, MARGIN = 2, convert_counts)
 ```
@@ -288,39 +328,33 @@ sms_test <- apply(sms_dtm_test, MARGIN = 2, convert_counts)
 \  
 
 # The Naïve Bayes Classifier
-
 Like most machine learning models, the Naïve Bayes classifier needs to be trained using the training data, predictions can then be made on the testing data to test how accurate the model is. 
 
 \  
 
-### Train the model
-
+### Train the Model
 ```{r}
 sms_model <- naiveBayes(sms_train, sms_train_labels)
 ```
 
 \  
 
-### Test the model
-
+### Test the Model
 ```{r}
 sms_test_pred <- predict(sms_model, sms_test)
 ```
 
 \  
 
-### Accuracy
-
+### Evaluate
 ```{r}
 CrossTable(sms_test_pred, sms_test_labels, prop.chisq = FALSE, prop.t = FALSE, dnn = c('predicted', 'actual'))
 ```
 
 \  
 
-### Laplace smoothing
-
+### Laplace Smoothing
 If a word appears in only ham messages and not in any spam messages in our training data, that word will have a probability of zero for spam and the classifier will classify any SMS with that word as ham every time. Laplace smoothing will prevent this.
-
 ```{r}
 sms_model <- naiveBayes(sms_train, sms_train_labels, laplace = 1)
 sms_test_pred <- predict(sms_model, sms_test)
@@ -331,7 +365,6 @@ CrossTable(sms_test_pred, sms_test_labels, prop.chisq = FALSE, prop.t = FALSE, d
 \  
 
 # Conclusion
-
 The classifier was able to predict spam messages with 95.9% accuracy, only classifying spam messages as ham 17 times. It was even better at classifying ham messages with 98.6% accuracy, classifying ham messages as spam only 7 times.  
 
 Using Laplace smoothing reduced the overall accuracy but improved the total classification of ham as spam. This classification is arguably more important to users. It would be better to let more spam messages through than to block any ham messages.  

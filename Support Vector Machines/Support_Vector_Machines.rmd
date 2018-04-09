@@ -7,7 +7,7 @@ csl: apa.csl
 subtitle: Predicting the Edibility of Mushrooms
 bibliography: bibliography.bibtex
 ---
-```{r setup, include=FALSE}
+```{r message=FALSE}
 # Packages Required
 library(e1071)  # SVM
 ```
@@ -50,10 +50,15 @@ The data set by @Schlimmer:1987, retrieved from the UCI machine learning reposit
 \  
 \  
 
-# Exploritory Data Analysis
+# Exploratory Data Analysis
 ```{r}
 shroom <- read.csv("agaricus-lepiota.csv") # Read in the data
 str(shroom)
+```
+
+\  
+
+```{r}
 lapply(shroom, summary)
 ```
 
@@ -77,8 +82,13 @@ shroom <- subset(x = shroom, select = -veil.type)
 In this case, stalk root contains many missing values. There are many different ways to handle this type of data, in this example the missing data is turned into a factor called "u" for unknown.
 ```{r}
 table(shroom$stalk.root) # Inspect
+```
+
+\  
+
+```{r}
 levels(shroom$stalk.root) <- c("u", "b", "c", "e", "r") # Convert
-table(shroom$stalk.root) # Inspect
+table(shroom$stalk.root) # Inspect Again
 ```
 
 \  
@@ -124,11 +134,16 @@ summary(shroom_pred)
 
 ### Evaluating Accuracy
 ```{r}
-# Create an accuracy function
+# Returns the percentage of correct predictions
 get.accuracy <- function(prediction, real) {
   accuracy <- prediction == real
   return (length(accuracy[accuracy == TRUE])/length(accuracy))
 }
+```
+
+\  
+
+```{r}
 get.accuracy(shroom_pred, shroom_test$class)
 ```
 
@@ -137,12 +152,18 @@ get.accuracy(shroom_pred, shroom_test$class)
 ### Different Kernels
 Different kernels may provide better or worse performance. Picking the right kernel requires a bit of domain knowledge. Knowing what features make elements similar can provide insight into which kernel should be applied.
 ```{r}
-kernels <- c("linear", "polynomial", "radial", "sigmoid")
+# Returns the accuracy of the SVM with the given kernels
 all.kernels <- function(kernel) {
   shroom_model <- svm(formula = class ~ ., data = shroom_train, kernel = kernel)
   shroom_pred <- predict(shroom_model, shroom_test)
   return(get.accuracy(shroom_pred, shroom_test$class))
 }
+```
+
+\  
+
+```{r}
+kernels <- c("linear", "polynomial", "radial", "sigmoid")
 kernel_accuracy <- unlist(lapply(kernels, all.kernels))
 kernel_accuracy*100
 ```
@@ -154,11 +175,16 @@ Polynomial and radial kernels provide 100% classification accuracy on this data 
 \  
 
 ### Tuning
-The `tune.svn` function will run N-fold cross validation for different hyperparameters in a specified range. In this case, performance with polynomial and radial kernels are 100% and tuning is not necessary. It is an expensive operation, so this example only checks 3 different values for the 'cost' and 'gamma' hyperparameters for reference.
+The `tune.svn` function will run 10-fold cross validation[link to evaluation metrics] for different hyperparameters in a specified range. In this case, performance with polynomial and radial kernels are 100% and tuning is not necessary. It is an expensive operation, so this example only checks 3 different values for the 'cost' and 'gamma' hyperparameters for reference. Figure 1 plots the results of the tuned hyperparameter grid. 
 ```{r}
-#shroom_tune_params <- tune.svm(class ~ ., data = shroom_train, gamma = 2^(-1:1), cost = 2^(-1:1))
-#summary(shroom_tune_params)
-#plot(shroom_tune_params)
+shroom_tune_params <- tune.svm(class ~ ., data = shroom_train, gamma = 2^(-1:1), cost = 2^(-1:1))
+summary(shroom_tune_params)
+```
+
+\  
+
+```{r fig.cap="Figure 1: 2x2 Tuned Hyperparameter Grid Plot", fig.align='center'}
+plot(shroom_tune_params)
 ```
 
 \  

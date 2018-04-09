@@ -4,16 +4,16 @@ author: "Ryan Whitell"
 output:
   html_document: default
 csl: apa.csl
-subtitle: Predicting The Quality of Wine
+subtitle: Predicting the Quality of Wine
 bibliography: bibliography.bibtex
 ---
-```{r setup, include=FALSE}
+```{r message=FALSE}
 # Packages Required
 library(ggplot2)       # Plotting
 library(rpart)         # Decision Tree
 library(randomForest)  # Random Forest
 library(gmodels)       # Cross Table
-library(rattle)        # Tree Diagramf
+library(rattle)        # Tree Diagram
 library(rpart.plot)    # Tree Diagram
 library(RColorBrewer)  # Tree Diagram
 ```
@@ -22,7 +22,6 @@ library(RColorBrewer)  # Tree Diagram
 \  
 
 # Introduction
-
 Decision trees are perhaps the most intuitive classification models for humans to interpret. Decision tree algorithms build trees by splitting data based off of some sort of information measure recursively until a stopping point. The many nuances of improving performance are omitted from this discussion but can easily be found online. The important characteristic is that each node contains a subset of the data, a node is split in such a way as to minimize the amount of diversity of its children.
 
 Random forests are an ensemble method for decisions trees. Many trees are built using different methods, usually by taking subsets of the training data. The classification of new data is the majority vote of all the trees (classification) or the average value (regression). Random forests generalize data better than single decision trees.
@@ -53,6 +52,11 @@ The data set by @Cortez:2009, retrieved from the UCI machine learning repository
 ```{r}
 wine <- read.table(file = "winequality-red.csv", header = TRUE, sep = ";") # Read in the data
 str(wine)
+```
+
+\  
+
+```{r}
 lapply(wine, summary)
 ```
 
@@ -62,8 +66,13 @@ The only thing that really sticks out is the quality variable. It is measured fr
 
 \  
 
-```{r}
+```{r fig.cap="Figure 1: Wine Quality Rating Frequency", fig.align='center'}
 ggplot(data=wine, aes(wine$quality)) + geom_histogram(bins = 6) + labs(x="Quality", y="Count", title="Wine Quality") + scale_x_continuous(breaks=seq(0,8)) # Plot the frequency
+```
+
+\  
+
+```{r}
 prop.table(table(wine$quality))*100 # Get the percentages
 ```
 
@@ -75,18 +84,14 @@ It looks like medium quality wines dominate this data set.
 \  
 
 # Data Preprocessing
-
 The data are already in a workable format. Decision trees are uninfluenced by different data types or scales, so minimal preprocessing needs to be done besides converting the response variable into a factor for the algorithm.
-
-\  
-
 ```{r}
 wine$quality <- as.factor(wine$quality)
 ```
 
 \  
 
-Also, the distribution of the quality variable of this data should be considered carefully. Because the quality is rated 0-10 but the data only contains wines rated between 3-8, a decision needs to be made about grouping. This decision should be made with the input of a domain expert, in this case a sommelier, about which grouping would best represent different wine qualities. For example, because there are no wines with a quality of 1, our model won't be able to predict a wine quality of 1 with the results of a physicochemical test. However, if a quality of 1 is not much different in the eyes of a sommelier than a 3, then we can group this range and label it 'poor.' This assumption is made here and the qualities are grouped as follows:
+Also, the distribution of the quality variable of this data should be considered carefully. Because the quality is rated 0-10 but the data only contains wines rated between 3-8, a decision needs to be made about grouping. This decision should be made with the input of a domain expert, in this case a sommelier, about which grouping would best represent different wine qualities. For example, because there are no wines with a quality of 1, our model won't be able to predict a wine quality of 1 with the results of a physiochemical test. However, if a quality of 1 is not much different in the eyes of a sommelier than a 3, then we can group this range and label it 'poor.' This assumption is made here and the qualities are grouped as follows:
 
   * 1-4:  low
   * 5-6:  medium
@@ -96,7 +101,13 @@ Also, the distribution of the quality variable of this data should be considered
 
 ```{r}
 levels(wine$quality) # Inspect
+```
+
+\  
+
+```{r}
 levels(wine$quality) <- c("low", "low", "med", "med", "high", "high") # Convert
+levels(wine$quality) # Inspect
 ```
 
 \  
@@ -115,27 +126,27 @@ wine_test <- wine[-idx, ] # 480 (30%)
 
 ### Train the Model
 ```{r}
-# control=rpart.control(minsplit=2, cp=0), adding these paramaters would build a full tree
-wine_model <- rpart(formula = quality ~ fixed.acidity  
-                                  + volatile.acidity 
-                                  + citric.acid 
-                                  + residual.sugar 
-                                  + chlorides 
-                                  + free.sulfur.dioxide 
-                                  + total.sulfur.dioxide
-                                  + density
-                                  + pH
-                                  + sulphates
-                                  + alcohol,
-               data = wine_train,
-               method = "class") 
+# control=rpart.control(minsplit=2, cp=0), adding these parameters would build a full tree
+wine_model <- rpart(formula = quality ~ fixed.acidity + 
+                                        volatile.acidity +
+                                        citric.acid +
+                                        residual.sugar +
+                                        chlorides +
+                                        free.sulfur.dioxide +
+                                        total.sulfur.dioxide +
+                                        density +
+                                        pH +
+                                        sulphates +
+                                        alcohol,
+                    data = wine_train,
+                    method = "class") 
 ```
 
 \  
 
 ### Visualize the Tree
 ```{r}
-fancyRpartPlot(model = wine_model, sub = "Figure 1: Wine Quality Tree")
+fancyRpartPlot(model = wine_model, sub = "Figure 2: Wine Quality Tree")
 ```
 
 \  
@@ -149,10 +160,16 @@ wine_pred <- predict(wine_model, wine_test, type = "class")
 
 ### Evaluating Performance
 ```{r}
+# Returns the percentage of correct predictions
 get.accuracy <- function(prediction, real) {
   accuracy <- prediction == real
   return (length(accuracy[accuracy == TRUE])/length(accuracy))
 }
+```
+
+\  
+
+```{r}
 get.accuracy(wine_pred, wine_test$quality)
 ```
 
@@ -166,7 +183,7 @@ CrossTable(wine_pred, wine_test$quality, prop.chisq = FALSE, prop.t = FALSE, dnn
 \  
 
 ### Summary
-The decision tree was able to predict the quality of wine with about 83% accuracy. However, the tree that was built did not have any leaves leading to a 'low' quality wine. This is most likely because the tree stopped building too early, as to avoid overfitting this data. This tree would most likely do poorly in a real world scenario even though it is the most accurate for this data set. It would be recommended to tweak the minimum split and complexity parameters until a tree that can classify 'low' quality wines is built.
+The decision tree was able to predict the quality of wine with about 83% accuracy. However, the tree that was built did not have any leaves leading to a 'low' quality wine. This is most likely because the tree stopped building too early, as to avoid overfitting this data. This tree would most likely do poorly in a real world scenario even though it is the most accurate for this data set. It would be recommended to tweak the minimum split and complexity parameters until a tree that can classify 'low' quality wines is built. Another technique would be to overgrow the tree and prune it as necessary.
 
 \  
 \  
@@ -178,7 +195,7 @@ Random forests should generalize even better than a single tree. Also, a random 
 
 ### Train the Model
 ```{r}
-# control=rpart.control(minsplit=2, cp=0), adding these paramaters would build a full tree
+# control=rpart.control(minsplit=2, cp=0), adding these parameters would build a full tree
 wine_rf_model <- randomForest(formula = quality ~ fixed.acidity  
                                   + volatile.acidity 
                                   + citric.acid 
@@ -226,10 +243,9 @@ CrossTable(wine_rf_pred, wine_test$quality, prop.chisq = FALSE, prop.t = FALSE, 
 \  
 
 # Conclusion
-
 The random forest provided a much better model than the decision tree. The random forest not only had higher accuracy, it was also able to generalize better by including the 'low' quality wine in its results, something the best performing decision tree was not able to do. However, the random forest was still unable to correctly classify a 'low' quality wine. 
 
-The decision tree only had to used 6 out of the 11 variables to classify wine at over 80% accuracy. The dominating variables were alcohol and sulphates for the decision tree and random forest. However, volatile.acidity had a greater impact on the random forest than it did on the decision tree.  
+The decision tree only had to use 6 out of the 11 variables to classify wine at over 80% accuracy. The dominating variables were alcohol and sulphates for the decision tree and random forest. However, volatile.acidity had a greater impact on the random forest than it did on the decision tree.  
 
 The accuracy of both methods were expected. The data was dominated by the 'med' quality wine and so most leaves led to that classification.  
 

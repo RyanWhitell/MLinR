@@ -7,7 +7,7 @@ subtitle: Solving the Tower of Hanoi and Playing Tic-Tac-Toe
 ---
 ```{r message=FALSE}
 # Packages Required
-library(ReinforcementLearning) # For everything
+library(ReinforcementLearning) # For Model Building
 ```
 
 \  
@@ -15,6 +15,9 @@ library(ReinforcementLearning) # For everything
 
 # Introduction
 Reinforcement learning is a more diverse area of machine learning than supervised and unsupervised learning. The simple idea behind reinforcement learning comes from behaviorist psychology. That is, in some state, an agent will take some action that it has learned will maximize its instant or future reward. There are many different types of reinforcement learning problems and many different types of algorithms to solve them. Using the `ReinforcementLearning` package in R, a policy can be learned from examples of state-action-reward transitions.
+
+\  
+\  
 
 # Tic-Tac-Toe
 The `tictactoe` data set contains examples of moves in the game Tic-Tac-Toe. It provides information on the rewards given by taking some action in some state. It also maps actions to next states. With many examples, a policy is produced:
@@ -59,8 +62,11 @@ get.move("..BBXXX.B")
 # All remaining moves lead to a draw
 ```
 
+\  
+\  
+
 # Tower of Hanoi
-The Tower of Hanoi is a famous math puzzle where the objective is to move `D` differently sized disks from one of `P` pegs by only moving one disk at a time and never staking large disks on top of smaller disks. Instead of learning from data, the environment can be defined in such a way that states and actions are mapped based off certain rules:
+The Tower of Hanoi is a famous math puzzle where the objective is to move `D` differently sized disks from one of `P` pegs by only moving one disk at a time and never stacking large disks on top of smaller disks. Instead of learning from data, the environment can be defined in such a way that states and actions are mapped based off certain rules:
 ```{r message=FALSE}
 # Initial Conditions
 disks <- 3
@@ -259,6 +265,8 @@ play.game <- function() {
 
 play.game()
 ```
+\  
+\  
 
 # Conclusion
 This is the tip of the iceberg for for reinforcement learning. Using a large dataset of Tic-Tac-Toe moves, a policy was generated that can play the game optimally. Also, by defining the rules of Tower of Hanoi, a policy was generated that can solve the puzzle, theoretically, optimally.

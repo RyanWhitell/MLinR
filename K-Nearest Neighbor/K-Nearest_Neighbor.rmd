@@ -62,9 +62,6 @@ The 'num' label defines the presence of heart disease with numbers 0-4:
 The purpose of exploring the data first is to get familiar with it and to see if anything is of interest.
 ```{r}
 heart <- read.csv("processed.cleveland.data.csv") # Read in the data
-```
-
-```{r}
 str(heart)
 ```
 
@@ -74,6 +71,8 @@ str(heart)
 ```{r}
 summary(heart$age)
 ```
+
+\  
 
 ```{r warning = FALSE, fig.cap="Figure 1: Age Distribution", fig.align='center'}
 ggplot(heart, aes(heart$age)) + geom_histogram(binwidth = 1) + labs(x="Age (Years)", y="Count", title="age")
@@ -104,6 +103,8 @@ table(heart$cp)
 summary(heart$trestbps)
 ```
 
+\  
+
 ```{r warning = FALSE, fig.cap="Figure 2: Resting Blood Pressure Distribution", fig.align='center'}
 ggplot(heart, aes(heart$trestbps)) + geom_histogram(binwidth = 1) + labs(x="Resting Blood Pressure (mm Hg)", y="Count", title="trestbps")
 ```
@@ -114,6 +115,8 @@ ggplot(heart, aes(heart$trestbps)) + geom_histogram(binwidth = 1) + labs(x="Rest
 ```{r}
 summary(heart$chol)
 ```
+
+\  
 
 ```{r warning = FALSE, fig.cap="Figure 3: Serum Cholestoral Distribution", fig.align='center'}
 ggplot(heart, aes(heart$chol)) + geom_histogram(binwidth = 1) + labs(x="Serum Cholestoral (mg/dl)", y="Count", title="chol")
@@ -143,6 +146,8 @@ table(heart$restecg)
 summary(heart$thalach)
 ```
 
+\  
+
 ```{r warning = FALSE, fig.cap="Figure 4: Maximum Heart Rate Achieved Distribution", fig.align='center'}
 ggplot(heart, aes(heart$thalach)) + geom_histogram(binwidth = 1) + labs(x="Hear Rate (b/min)", y="Count", title="thalach")
 ```
@@ -160,6 +165,8 @@ table(heart$exang)
 ```{r}
 summary(heart$oldpeak)
 ```
+
+\  
 
 ```{r warning = FALSE, fig.cap="Figure 5: ST Depression Induced by Exercise Relative to Rest Distribution", fig.align='center'}
 ggplot(heart, aes(heart$oldpeak)) + geom_histogram(binwidth = 0.1) + labs(x="ST depression (mm)", y="Count", title="oldpeak")
@@ -188,6 +195,7 @@ table(heart$ca)
 ```{r}
 table(heart$thal)
 ```
+
 \  
 
 The importance of some of these variables can be defined by a domain expert, in this case a Doctor. This could help determine which variables can be omitted or how much each variable should be contributing to the classification. The data seems good to use except for some missing values.
@@ -223,6 +231,8 @@ normalize <- function(x) {
 }
 ```
 
+\  
+
 ```{r}
 heart$age <- normalize(heart$age)
 heart$trestbps <- normalize(heart$trestbps)
@@ -244,6 +254,8 @@ heart$exang <- as.factor(heart$exang)
 heart$slope <- as.factor(heart$slope)
 ```
 
+\  
+
 ```{r}
 heart <- dummy.data.frame(heart)  # Converts all factor variables into dummy variables and returns a data frame
 ```
@@ -254,22 +266,19 @@ heart <- dummy.data.frame(heart)  # Converts all factor variables into dummy var
 # K-Nearest Neighbor
 
 ### Splitting the Data Between Testing and Training
-
 The data is cleaned and pre-processed, it can now be used for KNN classification. To test our data, it is split between a test set and a training set.
-
 ```{r}
 set.seed(77)                                                  # Get the same data each time
 idx <- sample(2, nrow(heart), replace=TRUE, prob=c(0.7, 0.3)) # Create 2 Subsets with ratio 70:30
 heart_train <- heart[idx==1, ]                                # Training subset
 heart_test <- heart[idx==2, ]                                 # Testing subset
-heart_train_diagnosis <- diagnosis[idx==1,]                   # Training labels
-heart_test_diagnosis <- diagnosis[idx==2,]                    # Testing labels
+heart_train_diagnosis <- diagnosis[idx==1]                    # Training labels
+heart_test_diagnosis <- diagnosis[idx==2]                     # Testing labels
 ```
 
 \  
 
 ### Building the Classifier
-
 ```{r}
 heart_test_predicions <- knn(train = heart_train, test = heart_test, cl = heart_train_diagnosis, k = 1)
 ```
@@ -277,7 +286,6 @@ heart_test_predicions <- knn(train = heart_train, test = heart_test, cl = heart_
 \  
 
 ### Evaluating Performance
-
 ```{r}
 # Returns the percentage of correct predictions
 get.accuracy <- function(prediction, real) {
@@ -285,6 +293,8 @@ get.accuracy <- function(prediction, real) {
   return (length(accuracy[accuracy == TRUE])/length(accuracy))
 }
 ```
+
+\  
 
 ```{r}
 get.accuracy(heart_test_predicions, heart_test_diagnosis)
@@ -294,9 +304,7 @@ get.accuracy(heart_test_predicions, heart_test_diagnosis)
 \  
 
 ### Improving the Performance
-
 One way to improve KNN performance is to find the right value for K. For small data sets, looping over different values of K to find the best one is practical.
-
 ```{r}
 # Returns the best K in range 1:max_k
 get.k <- function(train, test, train.cl, test.cl, max_k) {
@@ -320,12 +328,18 @@ get.k <- function(train, test, train.cl, test.cl, max_k) {
 }
 ```
 
+\  
+
 ```{r}
 results <- get.k(heart_train, heart_test, heart_train_diagnosis, heart_test_diagnosis, (length(heart_train$age)/2))
 results[results$Accuracy == max(results$Accuracy),] # Find the best K
 ```
 
+\ 
+
 The best K to pick would be the lowest K with the highest accuracy. The lower K value is more efficient.
+
+\ 
 
 ```{r fig.cap="Figure 6: Plot of Different K Values and Accuracy", fig.align='center'}
 ggplot(data=results, aes(results$K, results$Accuracy)) + geom_point() + labs(x = "K", y = "Accuracy", title="How KNN Accuracy Differs with K")

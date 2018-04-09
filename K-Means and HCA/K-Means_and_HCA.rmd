@@ -24,12 +24,12 @@ K-means and hierarchical cluster analysis (HCA) are both unsupervised learning t
 \  
 
 ### K-Means
-After the initial step of placing K points into a data space, K-means works by iterating between two steps until a local minimum is found:
+After the initial step of placing K points into a data space, K-means works by iterating between two steps until a local minima is found:
 
   * Assigning each element to one of the K centroids by closest distance
   * Re-calculating the location of the centroids so that the distance between each element and the centroid is optimized (the mean)
 
-The K-means algorithm iterates this pattern until a local minimum is achieved (hill climbing). Because this algorithm does not always find the global minimum, ensembling random restarts is usually employed. The important parameter in K-means is K, or number of clusters to find. Choosing the right K can require domain knowledge. 
+The K-means algorithm iterates this pattern until a local minima is achieved (hill climbing). Because this algorithm does not always find the global minima, ensembling random restarts is usually employed. The important parameter in K-means is K, or number of clusters to find. Choosing the right K can require domain knowledge. 
 
 \  
 
@@ -62,11 +62,10 @@ The data set by @Nuno:2011, retrieved from the UCI machine learning repository [
 The purpose of exploring the data first is to get familiar with it and to see if anything is of interest. One could argue that cluster analysis is an advanced form of EDA. 
 ```{r}
 customer <- read.csv("wholesale-customer-data.csv") # Read in the data
-```
-
-```{r}
 str(customer)
 ```
+
+\  
 
 ```{r}
 lapply(customer, summary)
@@ -84,7 +83,7 @@ ggplot(aes(x = Fresh), data = customer) +
 
 \  
 
-It looks like the data are following a long tail distribution with some major outliers. Comparing this distributions with region.
+It looks like the data are following a long tail distribution with some major outliers. Comparing this distributions with region:
 ```{r fig.cap="Figure 2: Comparison of Spending on Fresh Products for each Region", fig.align='center'}
 ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) + 
   geom_freqpoly(data = customer[customer$Region == 1, ], aes(color = "1"), binwidth = 1000) +
@@ -97,7 +96,7 @@ ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) +
 
 \  
 
-And Channel.
+And Channel:
 ```{r fig.cap="Figure 3: Comparison of Spending on Fresh Products for each Channel", fig.align='center'}
 ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) + 
   geom_freqpoly(data = customer[customer$Channel == 1, ], aes(color = "1"), binwidth = 1000) +
@@ -109,7 +108,7 @@ ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) +
 
 \  
 
-Perhaps some insight might be gained from comparing the total spending between regions and channels.
+Perhaps some insight might be gained from comparing the total spending between regions and channels:
 ```{r}
 # Convert the frame to a table
 customer <- data.table(customer)
@@ -161,6 +160,7 @@ customer_prop_region[Region == 3]$Prop <- customer_prop_region[Region == 3]$V1 /
 
 \  
 
+Now plot:
 ```{r fig.cap="Figure 4: Proportion of Spending per Channel", fig.align='center'}
 ggplot(data = customer_prop_channel, aes(x = Category, y = Prop, fill = Channel)) + 
   geom_bar(stat = "identity")
@@ -195,18 +195,23 @@ normalize <- function(x, max, min) {
 }
 ```
 
+\  
+
 ```{r}
 # Normalize Channel and Region
 customer_norm <- customer
 customer_norm$Channel <- normalize(customer$Channel, max(customer$Channel), min(customer$Channel))
 customer_norm$Region <- normalize(customer$Region, max(customer$Region), min(customer$Region))
-```
 
-```{r}
 # Get a subset of the data without 'Channel' and 'Region'
 customer_products <- subset(customer_norm, select = c(-Channel, -Region))
 str(customer_products)
 
+```
+
+\  
+
+```{r}
 # Get the maximum and minimum of all features except 'Channel' and 'Region'
 max_mu <- max(customer_products)
 min_mu <- min(customer_products)
@@ -218,9 +223,7 @@ customer_norm$Grocery <- normalize(customer$Grocery, max_mu, min_mu)
 customer_norm$Frozen <- normalize(customer$Frozen, max_mu, min_mu)
 customer_norm$Detergents_Paper <- normalize(customer$Detergents_Paper, max_mu, min_mu)
 customer_norm$Delicassen <- normalize(customer$Delicassen, max_mu, min_mu)
-```
 
-```{r}
 # Check the data 
 lapply(customer_norm, summary)
 ```
@@ -265,14 +268,10 @@ get.k <- function(data, max_k) {
 \  
 
 The best K is one that generalizes well. The position of this is at the 'elbow' of where the error improvements trail off, suggesting diminishing returns. 
-```{r}
+```{r fig.cap="Figure 6: K Value Error for All Data", fig.align='center'}
 # Get the K and error values
 k_values <- get.k(customer_norm, 20)
-```
 
-\  
-
-```{r fig.cap="Figure 6: K Value Error for All Data", fig.align='center'}
 # Plot
 ggplot(aes(x = K, y = Error), data = k_values) +
   geom_line() +
@@ -331,7 +330,11 @@ customer$cluster <- as.factor(customer_cluster$cluster)
 
 # Fresh
 aggregate(data = customer, Fresh ~ cluster, mean)
+```
 
+\  
+
+```{r}
 # Grocery
 aggregate(data = customer, Grocery ~ cluster, mean)
 ```
@@ -370,6 +373,8 @@ get.method <- function(data, methods) {
   return (as.data.frame(list("K" = k, "Method" = m)))
 }
 ```
+
+\  
 
 ```{r}
 # Running the following line produces messy output so it is commented out:
@@ -424,6 +429,7 @@ The dendrogram can provide some clues about how the data should be clustered, bu
 
 # Conclusion
 The data itself gave a clue as to what clusters to look for. Spending differed between the two different channels, retail and horeca. Retail favored grocery, milk, and detergents/paper, horeca favored fresh and frozen. This makes 2 obvious clusters. Taking into account the outliers in each feature, the two obvious clusters become 4- the extreme and the moderate spenders of each channel.  
+
 Unsupervised learning can be difficult. In this example, the analysis did not provide much insight besides the obvious. It would help if there was a business goal to achieve, this would drive analysis into more useful directions, rather than building nothing out of something.
 
 \  

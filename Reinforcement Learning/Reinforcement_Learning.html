@@ -126,11 +126,12 @@ $(document).ready(function () {
 
 
 <pre class="r"><code># Packages Required
-library(ReinforcementLearning) # For everything</code></pre>
+library(ReinforcementLearning) # For Model Building</code></pre>
 <p>   </p>
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
 <p>Reinforcement learning is a more diverse area of machine learning than supervised and unsupervised learning. The simple idea behind reinforcement learning comes from behaviorist psychology. That is, in some state, an agent will take some action that it has learned will maximize its instant or future reward. There are many different types of reinforcement learning problems and many different types of algorithms to solve them. Using the <code>ReinforcementLearning</code> package in R, a policy can be learned from examples of state-action-reward transitions.</p>
+<p>   </p>
 </div>
 <div id="tic-tac-toe" class="section level1">
 <h1>Tic-Tac-Toe</h1>
@@ -180,10 +181,11 @@ get.move(&quot;..B.X.X.B&quot;)</code></pre>
 get.move(&quot;..BBXXX.B&quot;)</code></pre>
 <pre><code>## [1] &quot;c1&quot;</code></pre>
 <pre class="r"><code># All remaining moves lead to a draw</code></pre>
+<p>   </p>
 </div>
 <div id="tower-of-hanoi" class="section level1">
 <h1>Tower of Hanoi</h1>
-<p>The Tower of Hanoi is a famous math puzzle where the objective is to move <code>D</code> differently sized disks from one of <code>P</code> pegs by only moving one disk at a time and never staking large disks on top of smaller disks. Instead of learning from data, the environment can be defined in such a way that states and actions are mapped based off certain rules:</p>
+<p>The Tower of Hanoi is a famous math puzzle where the objective is to move <code>D</code> differently sized disks from one of <code>P</code> pegs by only moving one disk at a time and never stacking large disks on top of smaller disks. Instead of learning from data, the environment can be defined in such a way that states and actions are mapped based off certain rules:</p>
 <pre class="r"><code># Initial Conditions
 disks &lt;- 3
 pegs &lt;- 3
@@ -310,12 +312,12 @@ data &lt;- sampleExperience(N = length(actions)*length(states)*10,
                          actions = actions)
 head(data)</code></pre>
 <pre><code>##     State Action Reward NextState
-## 1 1, 1, 1 -1,0,1 -7e+06   1, 1, 1
-## 2 1, 1, 1 1,0,-1 -7e+06   1, 1, 1
-## 3 0, 1, 0 0,1,-1 -7e+06   0, 1, 0
-## 4 0, 1, 2 1,-1,0 -7e+06   0, 1, 2
-## 5 2, 0, 2 0,-1,1 -7e+06   2, 0, 2
-## 6 1, 2, 1 1,0,-1 -1e+00   1, 0, 1</code></pre>
+## 1 2, 0, 0 0,1,-1 -1e+00   1, 0, 0
+## 2 2, 1, 1 0,1,-1 -1e+00   1, 1, 1
+## 3 0, 2, 2 -1,1,0 -1e+00   1, 2, 2
+## 4 2, 2, 0 -1,1,0 -1e+00   2, 2, 1
+## 5 0, 1, 0 -1,0,1 -1e+00   2, 1, 0
+## 6 0, 1, 2 1,-1,0 -7e+06   0, 1, 2</code></pre>
 <pre class="r"><code># Define reinforcement learning parameters
 control &lt;- list(alpha = 0.3, gamma = 0.7, epsilon = 0.2)
 
@@ -387,6 +389,7 @@ play.game &lt;- function() {
 
 play.game()</code></pre>
 <pre><code>## [1] &quot;-1,0,1&quot; &quot;-1,1,0&quot; &quot;0,1,-1&quot; &quot;-1,0,1&quot; &quot;1,-1,0&quot; &quot;0,-1,1&quot; &quot;-1,0,1&quot;</code></pre>
+<p>   </p>
 </div>
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>

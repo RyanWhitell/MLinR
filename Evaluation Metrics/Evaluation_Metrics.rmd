@@ -9,7 +9,7 @@ bibliography: bibliography.bibtex
 ---
 ```{r message=FALSE}
 # Packages Required
-library(caret)    # Everything
+library(caret)    # _C_lassification _A_nd _RE_gression _T_raining
 library(kernlab)  # Support Vector Machine
 library(RSNNS)    # Artificial Neural Network
 library(dummies)  # Dummy Variables
@@ -22,7 +22,9 @@ library(doSNOW)   # Executing in Parallel
 # Introduction
 Choosing the correct evaluation metrics are important when evaluating a model. Accuracy is a simple metric that is able to provide quick feedback for how good a model is, but for skewed data it can be misleading. For example, if the data contains 99990 examples with class '0' and 10 examples of class '1,' the model will be 99.99% accurate by always guessing '0.' As another example, take a neural net with 88 outputs indicating keys on a piano, if the ANN always guesses that no note is played (all zeros), it is still around 98% accurate.  
 
-There are many different metrics to consider, the best one depends on the goal of the model. In the case of cancer diagnosis, it is much better to lean towards a positive diagnosis even when there is no cancer (false positive) than to have a negative diagnosis when there is a presence of cancer (false negative). For spam detection, it is better to let some spam through if it means never blocking ham messages. The model should be evaluated based on the most important metric
+There are many different metrics to consider, the best one depends on the goal of the model. In the case of cancer diagnosis, it is much better to lean towards a positive diagnosis even when there is no cancer (false positive) than to have a negative diagnosis when there is a presence of cancer (false negative). For spam detection, it is better to let some spam through if it means never blocking ham messages. The model should be evaluated based on the most important metric.  
+
+This project uses the `caret` package to tune and train a Multi-Layer Perceptron (ANN) and a SVM for the purpose of investigating different evaluation metrics.
 
 \  
 \  
@@ -49,15 +51,16 @@ The data set by @nash:1994, retrieved from the UCI machine learning repository [
 The purpose of exploring the data first is to get familiar with it and to see if anything is of interest.
 ```{r}
 abalone <- read.csv("abalone-data.csv") # Read in the data
-```
-
-```{r}
 str(abalone)
 ```
+
+\  
 
 ```{r}
 lapply(abalone, summary)
 ```
+
+\  
 
 ```{r fig.cap="Figure 1: Age Distribution", fig.align='center'}
 ggplot(data = abalone, aes(x = Rings+1.5)) + 
@@ -87,6 +90,8 @@ normalize <- function(x) {
 }
 ```
 
+\  
+
 ```{r}
 abalone$Length <- normalize(abalone$Length)
 abalone$Diameter <- normalize(abalone$Diameter)
@@ -104,12 +109,12 @@ The Sex feature is categorical so it should be split into dummy variables.
 ```{r}
 # Create dummies out of the Sex feature
 abalone <- dummy.data.frame(abalone)
-```
 
-```{r}
 # Check the new features
 str(abalone)
 ```
+
+\  
 
 ```{r}
 # Remove the 'SexI' feature, (SexF == 0 & SexM == 0) is SexI
@@ -131,12 +136,12 @@ abalone$Age <- abalone$Rings+1.5
 
 # Aggregate into 3 labels
 abalone$Age <- cut(abalone$Age, breaks = c(0,7,12,31), labels = c("Young","Adult","Old"))
-```
 
-```{r}
 # Check the labels
 by(abalone$Rings+1.5, abalone$Age, table)
 ```
+
+\  
 
 ```{r}
 # Convert to factor
@@ -144,9 +149,7 @@ abalone$Age <- as.factor(abalone$Age)
 
 # Remove the 'Rings' feature
 abalone <- subset(abalone, select = -Rings)
-```
 
-```{r}
 # Check the data
 lapply(abalone, summary)
 ```
@@ -154,22 +157,29 @@ lapply(abalone, summary)
 \  
 
 ### Split the Data Between Testing and Training
-The `caret` package __createDataPartition__ function will split the training and the test set in a way that preserves label proportions.
+The `caret` package `createDataPartition()` function will split the training and the test set in a way that preserves label proportions.
 ```{r}
 set.seed(77)
 # Create the index using the caret package
 idx <- createDataPartition(abalone$Age,
-                          times = 1,
-                          p = 0.7,
-                          list = FALSE)
+                           times = 1,
+                           p = 0.7,
+                           list = FALSE)
 # Split the data
 abalone_train <- abalone[idx,]
 abalone_test <- abalone[-idx,]
 ```
 
+\  
+
 ```{r}
 # Check proportions
 prop.table(table(abalone_train$Age))
+```
+
+\  
+
+```{r}
 prop.table(table(abalone_test$Age))
 ```
 
@@ -190,8 +200,8 @@ tuning_method <- trainControl(method = "repeatedcv",
 tuning_grid <- expand.grid(sigma = c(0.1, 1, 10),
                            C = c(0.1, 1, 10))
 
-# Run 4 parallel instances to speed up execution
-cluster <- makeCluster(4, type = "SOCK")
+# Run 6 parallel instances to speed up execution
+cluster <- makeCluster(6, type = "SOCK")
 registerDoSNOW(cluster)
 
 # Train the model with the best cost and sigma found 
@@ -235,17 +245,17 @@ tuning_grid <- expand.grid(layer1 = c(2, 4, 6),
                            layer2 = c(2, 4, 6),
                            layer3 = c(2, 4, 6))
 
-# Run 4 parallel instances to speed execution
-cluster <- makeCluster(4, type = "SOCK")
+# Run 6 parallel instances to speed execution
+cluster <- makeCluster(6, type = "SOCK")
 registerDoSNOW(cluster)
 
 # Train the model with the best cost and sigma found 
 # during 10 fold cross validation
 abalone_model <- caret::train(Age ~ ., 
-                       data = abalone_train, 
-                       method = "mlpML",
-                       tuneGrid = tuning_grid,
-                       trControl = tuning_method)
+                              data = abalone_train, 
+                              method = "mlpML",
+                              tuneGrid = tuning_grid,
+                              trControl = tuning_method)
 
 # Stop parallel instances
 stopCluster(cluster)
@@ -272,7 +282,9 @@ caret::confusionMatrix(abalone_pred, abalone_test$Age)
 \  
 
 # Conclusion
-The evaluation depends on the goal of the analysis. In this case, predicting the age of the abalone without going through the painstaking process of counting the rings. Depending on what needed to be known, the amount of categories to break the abalone ages into could have been different. Perhaps it is only useful to know if the abalone is passed a certain age; the other end of this spectrum would be a regression analysis to predict the age by year. Most examples in our training set (around 60%) were labeled as 'Adult.' What was labeled as 'Adult' however was arbitrarily chosen. There is a chance that what our model predicted as 'Adult' might have been a better indication of what makes an abalone an adult. By looking at the confusion matrix, it is clear that there is a useful threshold. We know this because 'Young' and 'Old' were never misclassified with each other. The confusion matrix provides an overview of how well a model performs, but it can also give some insight into the data as well. 
+The evaluation depends on the goal of the analysis. In this case, predicting the age of the abalone without going through the painstaking process of counting the rings. Depending on what needed to be known, the amount of categories to break the abalone ages into could have been different. Perhaps it is only useful to know if the abalone is passed a certain age; the other end of this spectrum would be a regression analysis to predict the age by year. Most examples in our training set (around 60%) were labeled as 'Adult.' What was labeled as 'Adult' however was arbitrarily chosen. There is a chance that what our model predicted as 'Adult' might have been a better indication of what makes an abalone an adult. By looking at the confusion matrix, it is clear that there is a useful threshold. We know this because 'Young' and 'Old' were never misclassified with each other. The confusion matrix provides an overview of how well a model performs, but it can also give some insight into the data as well.  
+
+Without getting into too much depth, the `caret::confusionMatrix()` method returns many different evaluation metrics. Which metric to focus on will depend on the goal of the model.
 
 \  
 \  

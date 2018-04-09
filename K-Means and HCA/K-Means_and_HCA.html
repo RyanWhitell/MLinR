@@ -137,12 +137,12 @@ library(NbClust)     # Determine the Best K</code></pre>
 <p> </p>
 <div id="k-means" class="section level3">
 <h3>K-Means</h3>
-<p>After the initial step of placing K points into a data space, K-means works by iterating between two steps until a local minimum is found:</p>
+<p>After the initial step of placing K points into a data space, K-means works by iterating between two steps until a local minima is found:</p>
 <ul>
 <li>Assigning each element to one of the K centroids by closest distance</li>
 <li>Re-calculating the location of the centroids so that the distance between each element and the centroid is optimized (the mean)</li>
 </ul>
-<p>The K-means algorithm iterates this pattern until a local minimum is achieved (hill climbing). Because this algorithm does not always find the global minimum, ensembling random restarts is usually employed. The important parameter in K-means is K, or number of clusters to find. Choosing the right K can require domain knowledge.</p>
+<p>The K-means algorithm iterates this pattern until a local minima is achieved (hill climbing). Because this algorithm does not always find the global minima, ensembling random restarts is usually employed. The important parameter in K-means is K, or number of clusters to find. Choosing the right K can require domain knowledge.</p>
 <p> </p>
 </div>
 <div id="hierarchical-cluster-analysis" class="section level3">
@@ -172,8 +172,8 @@ library(NbClust)     # Determine the Best K</code></pre>
 <div id="exploratory-data-analysis" class="section level1">
 <h1>Exploratory Data Analysis</h1>
 <p>The purpose of exploring the data first is to get familiar with it and to see if anything is of interest. One could argue that cluster analysis is an advanced form of EDA.</p>
-<pre class="r"><code>customer &lt;- read.csv(&quot;wholesale-customer-data.csv&quot;) # Read in the data</code></pre>
-<pre class="r"><code>str(customer)</code></pre>
+<pre class="r"><code>customer &lt;- read.csv(&quot;wholesale-customer-data.csv&quot;) # Read in the data
+str(customer)</code></pre>
 <pre><code>## 'data.frame':    440 obs. of  8 variables:
 ##  $ Channel         : int  2 2 2 1 2 2 2 2 1 2 ...
 ##  $ Region          : int  3 3 3 3 3 3 3 3 3 3 ...
@@ -183,6 +183,7 @@ library(NbClust)     # Determine the Best K</code></pre>
 ##  $ Frozen          : int  214 1762 2405 6404 3915 666 480 1669 425 1159 ...
 ##  $ Detergents_Paper: int  2674 3293 3516 507 1777 1795 3140 3321 1716 7425 ...
 ##  $ Delicassen      : int  1338 1776 7844 1788 5185 1451 545 2566 750 2098 ...</code></pre>
+<p> </p>
 <pre class="r"><code>lapply(customer, summary)</code></pre>
 <pre><code>## $Channel
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
@@ -228,7 +229,7 @@ Figure 1: Histogram of Spending on Fresh Products
 </p>
 </div>
 <p> </p>
-<p>It looks like the data are following a long tail distribution with some major outliers. Comparing this distributions with region.</p>
+<p>It looks like the data are following a long tail distribution with some major outliers. Comparing this distributions with region:</p>
 <pre class="r"><code>ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) + 
   geom_freqpoly(data = customer[customer$Region == 1, ], aes(color = &quot;1&quot;), binwidth = 1000) +
   geom_freqpoly(data = customer[customer$Region == 2, ], aes(color = &quot;2&quot;), binwidth = 1000) +
@@ -243,7 +244,7 @@ Figure 2: Comparison of Spending on Fresh Products for each Region
 </p>
 </div>
 <p> </p>
-<p>And Channel.</p>
+<p>And Channel:</p>
 <pre class="r"><code>ggplot(data = customer, aes(x = Fresh, y=..count../sum(..count..))) + 
   geom_freqpoly(data = customer[customer$Channel == 1, ], aes(color = &quot;1&quot;), binwidth = 1000) +
   geom_freqpoly(data = customer[customer$Channel == 2, ], aes(color = &quot;2&quot;), binwidth = 1000) +
@@ -257,7 +258,7 @@ Figure 3: Comparison of Spending on Fresh Products for each Channel
 </p>
 </div>
 <p> </p>
-<p>Perhaps some insight might be gained from comparing the total spending between regions and channels.</p>
+<p>Perhaps some insight might be gained from comparing the total spending between regions and channels:</p>
 <pre class="r"><code># Convert the frame to a table
 customer &lt;- data.table(customer)
 
@@ -305,6 +306,7 @@ customer_prop_region[Region == 1]$Prop &lt;- customer_prop_region[Region == 1]$V
 customer_prop_region[Region == 2]$Prop &lt;- customer_prop_region[Region == 2]$V1 / region_totals[Region == 2]$V1
 customer_prop_region[Region == 3]$Prop &lt;- customer_prop_region[Region == 3]$V1 / region_totals[Region == 3]$V1</code></pre>
 <p> </p>
+<p>Now plot:</p>
 <pre class="r"><code>ggplot(data = customer_prop_channel, aes(x = Category, y = Prop, fill = Channel)) + 
   geom_bar(stat = &quot;identity&quot;)</code></pre>
 <div class="figure" style="text-align: center">
@@ -336,15 +338,17 @@ Figure 5: Proportion of Spending per Region
 <li>The other features all share the same unit of measurement, in this case, monetary units (m.u.)</li>
 </ul>
 <p>Therefore, ‘Channel’ and ‘Region’ should either be normalized separately or turned into dummy variables. All of the other features will be normalized relative to each other.</p>
-<pre class="r"><code># Returns a normalized vector based off max / min
+<pre class="r"><code># Returns a normalized vector between max / min
 normalize &lt;- function(x, max, min) {
   return ((x - min) / (max - min))
 }</code></pre>
+<p> </p>
 <pre class="r"><code># Normalize Channel and Region
 customer_norm &lt;- customer
 customer_norm$Channel &lt;- normalize(customer$Channel, max(customer$Channel), min(customer$Channel))
-customer_norm$Region &lt;- normalize(customer$Region, max(customer$Region), min(customer$Region))</code></pre>
-<pre class="r"><code># Get a subset of the data without 'Channel' and 'Region'
+customer_norm$Region &lt;- normalize(customer$Region, max(customer$Region), min(customer$Region))
+
+# Get a subset of the data without 'Channel' and 'Region'
 customer_products &lt;- subset(customer_norm, select = c(-Channel, -Region))
 str(customer_products)</code></pre>
 <pre><code>## Classes 'data.table' and 'data.frame':   440 obs. of  6 variables:
@@ -355,6 +359,7 @@ str(customer_products)</code></pre>
 ##  $ Detergents_Paper: int  2674 3293 3516 507 1777 1795 3140 3321 1716 7425 ...
 ##  $ Delicassen      : int  1338 1776 7844 1788 5185 1451 545 2566 750 2098 ...
 ##  - attr(*, &quot;.internal.selfref&quot;)=&lt;externalptr&gt;</code></pre>
+<p> </p>
 <pre class="r"><code># Get the maximum and minimum of all features except 'Channel' and 'Region'
 max_mu &lt;- max(customer_products)
 min_mu &lt;- min(customer_products)
@@ -365,8 +370,9 @@ customer_norm$Milk &lt;- normalize(customer$Milk, max_mu, min_mu)
 customer_norm$Grocery &lt;- normalize(customer$Grocery, max_mu, min_mu)
 customer_norm$Frozen &lt;- normalize(customer$Frozen, max_mu, min_mu)
 customer_norm$Detergents_Paper &lt;- normalize(customer$Detergents_Paper, max_mu, min_mu)
-customer_norm$Delicassen &lt;- normalize(customer$Delicassen, max_mu, min_mu)</code></pre>
-<pre class="r"><code># Check the data 
+customer_norm$Delicassen &lt;- normalize(customer$Delicassen, max_mu, min_mu)
+
+# Check the data 
 lapply(customer_norm, summary)</code></pre>
 <pre><code>## $Channel
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
@@ -435,9 +441,9 @@ get.k &lt;- function(data, max_k) {
 <p> </p>
 <p>The best K is one that generalizes well. The position of this is at the ‘elbow’ of where the error improvements trail off, suggesting diminishing returns.</p>
 <pre class="r"><code># Get the K and error values
-k_values &lt;- get.k(customer_norm, 20)</code></pre>
-<p> </p>
-<pre class="r"><code># Plot
+k_values &lt;- get.k(customer_norm, 20)
+
+# Plot
 ggplot(aes(x = K, y = Error), data = k_values) +
   geom_line() +
   scale_x_continuous(limits = c(0, 20), breaks = seq(0, 20, 1))</code></pre>
@@ -501,6 +507,7 @@ aggregate(data = customer, Fresh ~ cluster, mean)</code></pre>
 ## 1       1 35941.40
 ## 2       2  8000.04
 ## 3       3  8253.47</code></pre>
+<p> </p>
 <pre class="r"><code># Grocery
 aggregate(data = customer, Grocery ~ cluster, mean)</code></pre>
 <pre><code>##   cluster   Grocery
@@ -546,6 +553,7 @@ get.method &lt;- function(data, methods) {
 
   return (as.data.frame(list(&quot;K&quot; = k, &quot;Method&quot; = m)))
 }</code></pre>
+<p> </p>
 <pre class="r"><code># Running the following line produces messy output so it is commented out:
 # results &lt;- get.method(customer_norm, c(&quot;ward.D&quot;, &quot;ward.D2&quot;, &quot;single&quot;, &quot;complete&quot;, &quot;average&quot;, &quot;mcquitty&quot;, &quot;median&quot;, &quot;centroid&quot;))
 # results
@@ -612,8 +620,8 @@ Figure 12: average Dendrogram
 </div>
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>
-<p>The data itself gave a clue as to what clusters to look for. Spending differed between the two different channels, retail and horeca. Retail favored grocery, milk, and detergents/paper, horeca favored fresh and frozen. This makes 2 obvious clusters. Taking into account the outliers in each feature, the two obvious clusters become 4- the extreme and the moderate spenders of each channel.<br />
-Unsupervised learning can be difficult. In this example, the analysis did not provide much insight besides the obvious. It would help if there was a business goal to achieve, this would drive analysis into more useful directions, rather than building nothing out of something.</p>
+<p>The data itself gave a clue as to what clusters to look for. Spending differed between the two different channels, retail and horeca. Retail favored grocery, milk, and detergents/paper, horeca favored fresh and frozen. This makes 2 obvious clusters. Taking into account the outliers in each feature, the two obvious clusters become 4- the extreme and the moderate spenders of each channel.</p>
+<p>Unsupervised learning can be difficult. In this example, the analysis did not provide much insight besides the obvious. It would help if there was a business goal to achieve, this would drive analysis into more useful directions, rather than building nothing out of something.</p>
 <p>   </p>
 </div>
 <div id="references" class="section level1 unnumbered">
